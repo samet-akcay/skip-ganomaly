@@ -20,27 +20,28 @@ from __future__ import print_function
 from options import Options
 from lib.data import load_data
 from lib.model import Ganomaly
+from lib.model import Ganomaly2
 
 ##
-def main():
-    """ Training
-    """
+# def main():
+""" Training
+"""
 
-    ##
-    # ARGUMENTS
-    opt = Options().parse()
+##
+# ARGUMENTS
+opt = Options().parse()
 
-    ##
-    # LOAD DATA
-    dataloader = load_data(opt)
+##
+# LOAD DATA
+dataloader = load_data(opt)
 
-    ##
-    # LOAD MODEL
-    model = Ganomaly(opt, dataloader)
+##
+# LOAD MODEL
+model = Ganomaly2(opt, dataloader)
 
-    ##
-    # TRAIN MODEL
-    model.train()
+##
+# TRAIN MODEL
+model.train()
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()
