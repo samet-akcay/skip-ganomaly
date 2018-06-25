@@ -20,7 +20,6 @@ from __future__ import print_function
 from options import Options
 from lib.data import load_data
 from lib.model import Ganomaly
-from lib.model import Ganomaly2
 
 ##
 # def main():
