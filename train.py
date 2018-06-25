@@ -37,7 +37,7 @@ dataloader = load_data(opt)
 
 ##
 # LOAD MODEL
-model = Ganomaly2(opt, dataloader)
+model = Ganomaly(opt, dataloader)
 
 ##
 # TRAIN MODEL

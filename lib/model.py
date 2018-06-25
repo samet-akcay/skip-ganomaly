@@ -446,7 +446,7 @@ class Ganomaly2:
         ##
         # Create and initialize networks.
         # self.netg = NetG(self.opt)
-        self.netg = UNet(3, depth=5, merge_mode='concat')
+        self.netg = UNet(3, depth=3, merge_mode='concat')
         self.netd = NetD(self.opt)
         # self.netg.apply(weights_init)
         # self.netd.apply(weights_init)
@@ -729,8 +729,10 @@ class Ganomaly2:
         self.an_scores = torch.FloatTensor(len(self.dataloader['test'].dataset), 1).zero_()
         self.gt_labels = torch.LongTensor(len(self.dataloader['test'].dataset), 1).zero_()
 
-        self.latent_i = torch.FloatTensor(len(self.dataloader['test'].dataset), self.opt.nz).zero_()
-        self.latent_o = torch.FloatTensor(len(self.dataloader['test'].dataset), self.opt.nz).zero_()
+        # self.latent_i = torch.FloatTensor(len(self.dataloader['test'].dataset), self.opt.nz).zero_()
+        # self.latent_o = torch.FloatTensor(len(self.dataloader['test'].dataset), self.opt.nz).zero_()
+        self.latent_i = torch.FloatTensor(len(self.dataloader['test'].dataset), 4096).zero_()
+        self.latent_o = torch.FloatTensor(len(self.dataloader['test'].dataset), 4096).zero_()
 
         if self.opt.gpu_ids:
             self.an_scores = self.an_scores.cuda()
@@ -758,19 +760,21 @@ class Ganomaly2:
             error = torch.mean(torch.pow((error), 2), dim=1)
             time_o = time.time()
 
-            # latent_i = self.feat_real.view(sizes[0], sizes[1] * sizes[2] * sizes[3], 1, 1)
-            # latent_o = self.feat_fake.view(sizes[0], sizes[1] * sizes[2] * sizes[3], 1, 1)
+            latent_i = self.feat_real.view(sizes[0], sizes[1] * sizes[2] * sizes[3], 1, 1)
+            latent_o = self.feat_fake.view(sizes[0], sizes[1] * sizes[2] * sizes[3], 1, 1)
 
-            # if self.opt.gpu_ids:
-            #     self.an_scores[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0)] = error.data.view(error.size(0), 1)
-            #     self.gt_labels[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0)] = self.gt.data
-            #     self.latent_i[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_i.data.view(error.size(0), self.opt.nz)
-            #     self.latent_o[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_o.data.view(error.size(0), self.opt.nz)
-            # else:
-            #     self.an_scores[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), 1] = error.cpu().data.view(error.size(0), 1)
-            #     self.gt_labels[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0)] = self.gt.cpu().data
-            #     self.latent_i[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_i.cpu().data.view(error.size(0), self.opt.nz)
-            #     self.latent_o[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_o.cpu().data.view(error.size(0), self.opt.nz)
+            if self.opt.gpu_ids:
+                self.an_scores[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0)] = error.data.view(error.size(0), 1)
+                self.gt_labels[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0)] = self.gt.data
+                # self.latent_i[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_i.data.view(error.size(0), self.opt.nz)
+                # self.latent_o[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_o.data.view(error.size(0), self.opt.nz)
+                self.latent_i[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_i.data.view(error.size(0), 4096)
+                self.latent_o[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_o.data.view(error.size(0), 4096)
+            else:
+                self.an_scores[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), 1] = error.cpu().data.view(error.size(0), 1)
+                self.gt_labels[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0)] = self.gt.cpu().data
+                self.latent_i[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_i.cpu().data.view(error.size(0), self.opt.nz)
+                self.latent_o[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_o.cpu().data.view(error.size(0), self.opt.nz)
             self.times.append(time_o - time_i)
 
             # Save test images.
@@ -783,8 +787,8 @@ class Ganomaly2:
                 vutils.save_image(fake, '%s/fake_%03d.eps' % (dst, i+1), normalize=True)
 
         # Measure inference time.
-        # self.times = np.array(self.times)
-        # self.times = np.mean(self.times[:100] * 1000)
+        self.times = np.array(self.times)
+        self.times = np.mean(self.times[:100] * 1000)
         # TODO: Fix timing.
         self.times = np.mean(self.times * 1000)
 
