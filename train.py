@@ -42,16 +42,3 @@ model = load_model(opt, dataloader)
 ##
 # TRAIN MODEL
 model.train()
-
-##
-
-# def load_model(opt, dataloader):
-#     import importlib
-#     model_name = opt.model
-#     model_path = f"lib.models.{model_name}"
-#     model_lib  = importlib.import_module(model_path)
-#     model = getattr(modellib, model_name.title())
-#     return model(opt, dataloader)
-
-# if __name__ == '__main__':
-#     main()

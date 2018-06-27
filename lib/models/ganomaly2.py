@@ -15,12 +15,35 @@ import torch.nn as nn
 import torch.utils.data
 import torchvision.utils as vutils
 
-from lib.networks import NetG, NetD, weights_init
+from lib.models.networks import NetD, weights_init, define_G
 from lib.visualizer import Visualizer
 from lib.loss import l2_loss
 from lib.evaluate import roc
 
 ##
+
+
+class NetG(nn.Module):
+    """
+    GENERATOR NETWORK
+    """
+
+    def __init__(self, opt):
+        super(NetG, self).__init__()
+        self.model = define_G(input_nc=3, output_nc=3, ngf=64,
+                              which_model_netG='unet_32',
+                              norm='batch', use_dropout=False, init_type='normal',
+                              gpu_ids=opt.gpu_ids)
+
+    def forward(self, x):
+        latent_i = self.encoder1(x)
+        gen_imag = self.decoder(latent_i)
+        latent_o = self.encoder2(gen_imag)
+        return gen_imag, latent_i, latent_o
+
+##
+
+
 class Ganomaly2:
     """GANomaly Class
     """
@@ -40,7 +63,8 @@ class Ganomaly2:
         self.dataloader = dataloader
         self.trn_dir = os.path.join(self.opt.outf, self.opt.name, 'train')
         self.tst_dir = os.path.join(self.opt.outf, self.opt.name, 'test')
-        self.device = torch.device("cuda:0" if self.opt.gpu_ids!=-1 else "cpu")
+        self.device = torch.device(
+            "cuda:0" if self.opt.gpu_ids != -1 else "cpu")
 
         # -- Discriminator attributes.
         self.out_d_real = None
@@ -68,7 +92,11 @@ class Ganomaly2:
 
         ##
         # Create and initialize networks.
-        self.netg = NetG(self.opt).to(self.device)
+        # self.netg = NetG(self.opt).to(self.device)
+        self.netg = define_G(input_nc=3, output_nc=3, ngf=64,
+                             which_model_netG='unet_32',
+                             norm='batch', use_dropout=False, init_type='normal',
+                             gpu_ids=opt.gpu_ids)
         self.netd = NetD(self.opt).to(self.device)
         self.netg.apply(weights_init)
         self.netd.apply(weights_init)
@@ -76,9 +104,12 @@ class Ganomaly2:
         ##
         if self.opt.resume != '':
             print("\nLoading pre-trained networks.")
-            self.opt.iter = torch.load(os.path.join(self.opt.resume, 'netG.pth'))['epoch']
-            self.netg.load_state_dict(torch.load(os.path.join(self.opt.resume, 'netG.pth'))['state_dict'])
-            self.netd.load_state_dict(torch.load(os.path.join(self.opt.resume, 'netD.pth'))['state_dict'])
+            self.opt.iter = torch.load(os.path.join(
+                self.opt.resume, 'netG.pth'))['epoch']
+            self.netg.load_state_dict(torch.load(os.path.join(
+                self.opt.resume, 'netG.pth'))['state_dict'])
+            self.netd.load_state_dict(torch.load(os.path.join(
+                self.opt.resume, 'netD.pth'))['state_dict'])
             print("\tDone.\n")
 
         print(self.netg)
@@ -92,10 +123,14 @@ class Ganomaly2:
 
         ##
         # Initialize input tensors.
-        self.input = torch.empty(size=(self.opt.batchsize, 3, self.opt.isize, self.opt.isize), dtype=torch.float32, device=self.device)
-        self.label = torch.empty(size=(self.opt.batchsize,), dtype=torch.float32, device=self.device)
-        self.gt    = torch.empty(size=(opt.batchsize,), dtype=torch.long, device=self.device)
-        self.fixed_input = torch.empty(size=(self.opt.batchsize, 3, self.opt.isize, self.opt.isize), dtype=torch.float32, device=self.device)
+        self.input = torch.empty(size=(self.opt.batchsize, 3, self.opt.isize,
+                                       self.opt.isize), dtype=torch.float32, device=self.device)
+        self.label = torch.empty(
+            size=(self.opt.batchsize,), dtype=torch.float32, device=self.device)
+        self.gt = torch.empty(size=(opt.batchsize,),
+                              dtype=torch.long, device=self.device)
+        self.fixed_input = torch.empty(size=(
+            self.opt.batchsize, 3, self.opt.isize, self.opt.isize), dtype=torch.float32, device=self.device)
         self.real_label = 1
         self.fake_label = 0
 
@@ -104,8 +139,10 @@ class Ganomaly2:
         if self.opt.isTrain:
             self.netg.train()
             self.netd.train()
-            self.optimizer_d = optim.Adam(self.netd.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
-            self.optimizer_g = optim.Adam(self.netg.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
+            self.optimizer_d = optim.Adam(self.netd.parameters(
+            ), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
+            self.optimizer_g = optim.Adam(self.netg.parameters(
+            ), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
 
     ##
     def set_input(self, input):
@@ -133,17 +170,22 @@ class Ganomaly2:
         self.label.data.resize_(self.opt.batchsize).fill_(self.real_label)
         self.out_d_real, self.feat_real = self.netd(self.input)
         self.err_d_real = self.bce_criterion(self.out_d_real, self.label)
-        self.err_d_real.backward()
+        self.err_d_real.backward(retain_graph=True)
         # --
         # Train with fake
         self.label.data.resize_(self.opt.batchsize).fill_(self.fake_label)
-        self.fake, self.latent_i, self.latent_o = self.netg(self.input)
+        self.fake = self.netg(self.input)
 
         self.out_d_fake, self.feat_fake = self.netd(self.fake.detach())
         self.err_d_fake = self.bce_criterion(self.out_d_fake, self.label)
+
+        # Feature Loss btw real and fake images.
+        self.err_g_enc = self.l2l_criterion(self.feat_fake, self.feat_real)
+        self.err_g_enc.backward(retain_graph=True)
+
         # --
         self.err_d_fake.backward()
-        self.err_d = self.err_d_real + self.err_d_fake
+        self.err_d = self.err_d_real + self.err_d_fake + self.err_g_enc
         self.optimizer_d.step()
 
     ##
@@ -167,8 +209,9 @@ class Ganomaly2:
 
         self.err_g_bce = self.bce_criterion(self.out_g, self.label)
         self.err_g_l1l = self.l1l_criterion(self.fake, self.input)  # constrain x' to look like x
-        self.err_g_enc = self.l2l_criterion(self.latent_o, self.latent_i)
-        self.err_g = self.err_g_bce + self.err_g_l1l * self.opt.alpha + self.err_g_enc
+        # self.err_g_enc = self.l2l_criterion(self.latent_o, self.latent_i)
+        # self.err_g = self.err_g_bce + self.err_g_l1l * self.opt.alpha + self.err_g_enc
+        self.err_g = self.err_g_bce + self.err_g_l1l * self.opt.alpha
 
         self.err_g.backward(retain_graph=True)
         self.optimizer_g.step()
@@ -225,7 +268,8 @@ class Ganomaly2:
             epoch ([int]): Current epoch number.
         """
 
-        weight_dir = os.path.join(self.opt.outf, self.opt.name, 'train', 'weights')
+        weight_dir = os.path.join(
+            self.opt.outf, self.opt.name, 'train', 'weights')
         if not os.path.exists(weight_dir):
             os.makedirs(weight_dir)
 
@@ -251,18 +295,23 @@ class Ganomaly2:
             if self.total_steps % self.opt.print_freq == 0:
                 errors = self.get_errors()
                 if self.opt.display:
-                    counter_ratio = float(epoch_iter) / len(self.dataloader['train'].dataset)
-                    self.visualizer.plot_current_errors(self.epoch, counter_ratio, errors)
+                    counter_ratio = float(epoch_iter) / \
+                        len(self.dataloader['train'].dataset)
+                    self.visualizer.plot_current_errors(
+                        self.epoch, counter_ratio, errors)
 
             if self.total_steps % self.opt.save_image_freq == 0:
                 reals, fakes, fixed = self.get_current_images()
-                self.visualizer.save_current_images(self.epoch, reals, fakes, fixed)
+                self.visualizer.save_current_images(
+                    self.epoch, reals, fakes, fixed)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes, fixed)
 
-        print(">> Training model %s. Epoch %d/%d" % (self.name(), self.epoch+1, self.opt.niter))
-        self.visualizer.print_current_errors(self.epoch, errors)
+        print(">> Training model %s. Epoch %d/%d" %
+              (self.name(), self.epoch+1, self.opt.niter))
+        # self.visualizer.print_current_errors(self.epoch, errors)
     ##
+
     def train(self):
         """ Train the model
         """
@@ -297,7 +346,8 @@ class Ganomaly2:
         with torch.no_grad():
             # Load the weights of netg and netd.
             if self.opt.load_weights:
-                path = "./output/{}/{}/train/weights/netG.pth".format(self.name().lower(), self.opt.dataset)
+                path = "./output/{}/{}/train/weights/netG.pth".format(
+                    self.name().lower(), self.opt.dataset)
                 pretrained_dict = torch.load(path)['state_dict']
 
                 try:
@@ -309,10 +359,14 @@ class Ganomaly2:
             self.opt.phase = 'test'
 
             # Create big error tensor for the test set.
-            self.an_scores = torch.zeros(size=(len(self.dataloader['test'].dataset),), dtype=torch.float32, device=self.device)
-            self.gt_labels = torch.zeros(size=(len(self.dataloader['test'].dataset),), dtype=torch.long,    device=self.device)
-            self.latent_i  = torch.zeros(size=(len(self.dataloader['test'].dataset), self.opt.nz), dtype=torch.float32, device=self.device)
-            self.latent_o  = torch.zeros(size=(len(self.dataloader['test'].dataset), self.opt.nz), dtype=torch.float32, device=self.device)
+            self.an_scores = torch.zeros(size=(
+                len(self.dataloader['test'].dataset),), dtype=torch.float32, device=self.device)
+            self.gt_labels = torch.zeros(size=(
+                len(self.dataloader['test'].dataset),), dtype=torch.long,    device=self.device)
+            self.latent_i = torch.zeros(size=(len(
+                self.dataloader['test'].dataset), 4096), dtype=torch.float32, device=self.device)
+            self.latent_o = torch.zeros(size=(len(
+                self.dataloader['test'].dataset), 4096), dtype=torch.float32, device=self.device)
 
             print("   Testing model %s." % self.name())
             self.times = []
@@ -323,37 +377,57 @@ class Ganomaly2:
                 epoch_iter += self.opt.batchsize
                 time_i = time.time()
                 self.set_input(data)
-                self.fake, latent_i, latent_o = self.netg(self.input)
+                self.fake = self.netg(self.input)
 
-                error = torch.mean(torch.pow((latent_i-latent_o), 2), dim=1)
+                _, self.feat_real = self.netd(self.input)
+                _, self.feat_fake = self.netd(self.fake)
+
+                sizes = self.feat_fake.size()
+                error = (self.feat_fake-self.feat_real).view(sizes[0], sizes[1] * sizes[2] * sizes[3], 1)
+
+                error = torch.mean(torch.pow(error, 2), dim=1)
                 time_o = time.time()
 
-                self.an_scores[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0)] = error.reshape(error.size(0))
-                self.gt_labels[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0)] = self.gt.reshape(error.size(0))
-                self.latent_i [i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_i.reshape(error.size(0), self.opt.nz)
-                self.latent_o [i*self.opt.batchsize : i*self.opt.batchsize+error.size(0), :] = latent_o.reshape(error.size(0), self.opt.nz)
+                latent_i = self.feat_real.view(sizes[0], sizes[1] * sizes[2] * sizes[3], 1, 1)
+                latent_o = self.feat_fake.view(sizes[0], sizes[1] * sizes[2] * sizes[3], 1, 1)
+
+                self.an_scores[i*self.opt.batchsize: i*self.opt.batchsize +
+                               error.size(0)] = error.reshape(error.size(0))
+                self.gt_labels[i*self.opt.batchsize: i*self.opt.batchsize +
+                               error.size(0)] = self.gt.reshape(error.size(0))
+                self.latent_i[i*self.opt.batchsize: i*self.opt.batchsize +
+                              error.size(0), :] = latent_i.reshape(error.size(0), 4096)
+                self.latent_o[i*self.opt.batchsize: i*self.opt.batchsize +
+                              error.size(0), :] = latent_o.reshape(error.size(0), 4096)
 
                 self.times.append(time_o - time_i)
 
                 # Save test images.
                 if self.opt.save_test_images:
-                    dst = os.path.join(self.opt.outf, self.opt.name, 'test', 'images')
+                    dst = os.path.join(
+                        self.opt.outf, self.opt.name, 'test', 'images')
                     if not os.path.isdir(dst):
                         os.makedirs(dst)
                     real, fake, _ = self.get_current_images()
-                    vutils.save_image(real, '%s/real_%03d.eps' % (dst, i+1), normalize=True)
-                    vutils.save_image(fake, '%s/fake_%03d.eps' % (dst, i+1), normalize=True)
+                    vutils.save_image(real, '%s/real_%03d.eps' %
+                                      (dst, i+1), normalize=True)
+                    vutils.save_image(fake, '%s/fake_%03d.eps' %
+                                      (dst, i+1), normalize=True)
 
             # Measure inference time.
             self.times = np.array(self.times)
             self.times = np.mean(self.times[:100] * 1000)
 
             # Scale error vector between [0, 1]
-            self.an_scores = (self.an_scores - torch.min(self.an_scores)) / (torch.max(self.an_scores) - torch.min(self.an_scores))
+            self.an_scores = (self.an_scores - torch.min(self.an_scores)) / \
+                (torch.max(self.an_scores) - torch.min(self.an_scores))
             auc, eer = roc(self.gt_labels, self.an_scores)
-            performance = OrderedDict([('Avg Run Time (ms/batch)', self.times), ('EER', eer), ('AUC', auc)])
+            performance = OrderedDict(
+                [('Avg Run Time (ms/batch)', self.times), ('EER', eer), ('AUC', auc)])
 
             if self.opt.display_id > 0 and self.opt.phase == 'test':
-                counter_ratio = float(epoch_iter) / len(self.dataloader['test'].dataset)
-                self.visualizer.plot_performance(self.epoch, counter_ratio, performance)
+                counter_ratio = float(epoch_iter) / \
+                    len(self.dataloader['test'].dataset)
+                self.visualizer.plot_performance(
+                    self.epoch, counter_ratio, performance)
             return performance

@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.utils.data
 import torchvision.utils as vutils
 
-from lib.networks import NetG, NetD, weights_init
+from lib.models.networks import NetG, NetD, weights_init
 from lib.visualizer import Visualizer
 from lib.loss import l2_loss
 from lib.evaluate import roc
