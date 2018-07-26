@@ -30,7 +30,7 @@ class NetG(nn.Module):
 
     def __init__(self, opt):
         super(NetG, self).__init__()
-        self.model = define_G(input_nc=3, output_nc=3, ngf=64,
+        self.model = define_G(input_nc=opt.nc, output_nc=opt.nc, ngf=64,
                               which_model_netG='unet_32',
                               norm='batch', use_dropout=False, init_type='normal',
                               gpu_ids=opt.gpu_ids)
@@ -93,7 +93,7 @@ class Ganomaly2:
         ##
         # Create and initialize networks.
         # self.netg = NetG(self.opt).to(self.device)
-        self.netg = define_G(input_nc=3, output_nc=3, ngf=64,
+        self.netg = define_G(input_nc=self.opt.nc, output_nc=self.opt.nc, ngf=self.opt.ngf,
                              which_model_netG='unet_32',
                              norm='batch', use_dropout=False, init_type='normal',
                              gpu_ids=opt.gpu_ids)
@@ -256,7 +256,7 @@ class Ganomaly2:
 
         reals = self.input.data
         fakes = self.fake.data
-        fixed = self.netg(self.fixed_input)[0].data
+        fixed = self.netg(self.fixed_input).data
 
         return reals, fakes, fixed
 
