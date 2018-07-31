@@ -15,14 +15,12 @@ import torch.nn as nn
 import torch.utils.data
 import torchvision.utils as vutils
 
-from lib.models.networks import NetD, weights_init, define_G
+from lib.models.networks import NetD, NetDv2, weights_init, define_G
 from lib.visualizer import Visualizer
 from lib.loss import l2_loss
 from lib.evaluate import roc
 
 ##
-
-
 class NetG(nn.Module):
     """
     GENERATOR NETWORK
@@ -97,7 +95,8 @@ class Ganomaly2:
                              which_model_netG='unet_32',
                              norm='batch', use_dropout=False, init_type='normal',
                              gpu_ids=opt.gpu_ids)
-        self.netd = NetD(self.opt).to(self.device)
+        self.netd = NetDv2(self.opt).to(self.device)
+        # self.netd2 = NetDv2(self.opt).to(self.device)
         self.netg.apply(weights_init)
         self.netd.apply(weights_init)
 
@@ -364,9 +363,9 @@ class Ganomaly2:
             self.gt_labels = torch.zeros(size=(
                 len(self.dataloader['test'].dataset),), dtype=torch.long,    device=self.device)
             self.latent_i = torch.zeros(size=(len(
-                self.dataloader['test'].dataset), 4096), dtype=torch.float32, device=self.device)
+                self.dataloader['test'].dataset), self.opt.nz), dtype=torch.float32, device=self.device)
             self.latent_o = torch.zeros(size=(len(
-                self.dataloader['test'].dataset), 4096), dtype=torch.float32, device=self.device)
+                self.dataloader['test'].dataset), self.opt.nz), dtype=torch.float32, device=self.device)
 
             print("   Testing model %s." % self.name())
             self.times = []
@@ -383,22 +382,21 @@ class Ganomaly2:
                 _, self.feat_fake = self.netd(self.fake)
 
                 sizes = self.feat_fake.size()
-                error = (self.feat_fake-self.feat_real).view(sizes[0], sizes[1] * sizes[2] * sizes[3], 1)
+                error = (self.feat_fake-self.feat_real).view(sizes[0], sizes[1] * sizes[2] * sizes[3])
 
                 error = torch.mean(torch.pow(error, 2), dim=1)
                 time_o = time.time()
 
-                latent_i = self.feat_real.view(sizes[0], sizes[1] * sizes[2] * sizes[3], 1, 1)
-                latent_o = self.feat_fake.view(sizes[0], sizes[1] * sizes[2] * sizes[3], 1, 1)
+                latent_i = self.feat_real.view(sizes[0], sizes[1] * sizes[2] * sizes[3])
+                latent_o = self.feat_fake.view(sizes[0], sizes[1] * sizes[2] * sizes[3])
 
-                self.an_scores[i*self.opt.batchsize: i*self.opt.batchsize +
-                               error.size(0)] = error.reshape(error.size(0))
+                self.an_scores[i*self.opt.batchsize: i*self.opt.batchsize + error.size(0)] = error.reshape(error.size(0))
                 self.gt_labels[i*self.opt.batchsize: i*self.opt.batchsize +
                                error.size(0)] = self.gt.reshape(error.size(0))
                 self.latent_i[i*self.opt.batchsize: i*self.opt.batchsize +
-                              error.size(0), :] = latent_i.reshape(error.size(0), 4096)
+                              error.size(0), :] = latent_i.reshape(error.size(0), self.opt.nz)
                 self.latent_o[i*self.opt.batchsize: i*self.opt.batchsize +
-                              error.size(0), :] = latent_o.reshape(error.size(0), 4096)
+                              error.size(0), :] = latent_o.reshape(error.size(0), self.opt.nz)
 
                 self.times.append(time_o - time_i)
 
