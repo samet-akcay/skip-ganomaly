@@ -6,7 +6,6 @@ LOAD DATA from file.
 import os
 import torch
 import numpy as np
-import torchvision.datasets as datasets
 from torchvision.datasets import MNIST
 from torchvision.datasets import CIFAR10
 from torchvision.datasets import ImageFolder
@@ -97,6 +96,25 @@ def load_data(opt):
             abn_cls_idx=opt.anomaly_class
         )
 
+        dataloader = {x: torch.utils.data.DataLoader(dataset=dataset[x],
+                                                     batch_size=opt.batchsize,
+                                                     shuffle=shuffle[x],
+                                                     num_workers=int(opt.workers),
+                                                     drop_last=drop_last_batch[x]) for x in splits}
+        return dataloader
+
+    elif opt.dataset in ['UCSDped1', 'UCSDped2']:
+        opt.dataroot = f'./data/UCSD_Anomaly_Dataset/{opt.dataset}'
+        splits = ['train', 'test']
+        drop_last_batch = {'train': True, 'test': False}
+        shuffle = {'train': True, 'test': True}
+        transform = transforms.Compose([transforms.Scale(opt.isize),
+                                        transforms.CenterCrop(opt.isize),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
+        from .datasets import UCSD
+        dataset = {x: UCSD(root=os.path.join(opt.dataroot, x), transform=transform, split=x) \
+                   for x in splits}
         dataloader = {x: torch.utils.data.DataLoader(dataset=dataset[x],
                                                      batch_size=opt.batchsize,
                                                      shuffle=shuffle[x],

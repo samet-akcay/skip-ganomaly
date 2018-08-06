@@ -18,7 +18,7 @@ TRAIN GANOMALY
 from __future__ import print_function
 
 from options import Options
-from lib.data import load_data
+from lib.data.dataloader import load_data
 # from lib.models.ganomaly import Ganomaly
 from lib.models import load_model
 
@@ -37,7 +37,6 @@ dataloader = load_data(opt)
 
 ##
 # LOAD MODEL
-# model = Ganomaly(opt, dataloader)
 model = load_model(opt, dataloader)
 ##
 # TRAIN MODEL

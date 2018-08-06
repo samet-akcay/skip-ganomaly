@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.utils.data
 import torchvision.utils as vutils
 
-from lib.models.networks import NetD, NetDv2, weights_init, define_G
+from lib.models.networks import NetD, NetDv2, weights_init, define_G, get_scheduler
 from lib.visualizer import Visualizer
 from lib.loss import l2_loss
 from lib.evaluate import roc
@@ -124,6 +124,8 @@ class Ganomaly2:
         # Initialize input tensors.
         self.input = torch.empty(size=(self.opt.batchsize, 3, self.opt.isize,
                                        self.opt.isize), dtype=torch.float32, device=self.device)
+        self.noise = torch.empty(size=(self.opt.batchsize, 3, self.opt.isize,
+                                       self.opt.isize), dtype=torch.float32, device=self.device)
         self.label = torch.empty(
             size=(self.opt.batchsize,), dtype=torch.float32, device=self.device)
         self.gt = torch.empty(size=(opt.batchsize,),
@@ -138,10 +140,12 @@ class Ganomaly2:
         if self.opt.isTrain:
             self.netg.train()
             self.netd.train()
-            self.optimizer_d = optim.Adam(self.netd.parameters(
-            ), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
-            self.optimizer_g = optim.Adam(self.netg.parameters(
-            ), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
+            self.optimizers  = []
+            self.optimizer_d = optim.Adam(self.netd.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
+            self.optimizer_g = optim.Adam(self.netg.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
+            self.optimizers.append(self.optimizer_d)
+            self.optimizers.append(self.optimizer_g)
+            self.schedulers = [get_scheduler(optimizer, opt) for optimizer in self.optimizers]
 
     ##
     def set_input(self, input):
@@ -152,6 +156,8 @@ class Ganomaly2:
         """
         self.input.data.resize_(input[0].size()).copy_(input[0])
         self.gt.data.resize_(input[1].size()).copy_(input[1])
+        noise = torch.randn(self.noise.size())
+        self.noise.data.copy_(noise)
 
         # Copy the first batch as the fixed input.
         if self.total_steps == self.opt.batchsize:
@@ -173,7 +179,7 @@ class Ganomaly2:
         # --
         # Train with fake
         self.label.data.resize_(self.opt.batchsize).fill_(self.fake_label)
-        self.fake = self.netg(self.input)
+        self.fake = self.netg(self.input + self.noise)
 
         self.out_d_fake, self.feat_fake = self.netd(self.fake.detach())
         self.err_d_fake = self.bce_criterion(self.out_d_fake, self.label)
@@ -214,6 +220,15 @@ class Ganomaly2:
 
         self.err_g.backward(retain_graph=True)
         self.optimizer_g.step()
+
+    def update_learning_rate(self):
+        """ Update learning rate based on the rule provided in options.
+        """
+
+        for scheduler in self.schedulers:
+            scheduler.step()
+        # lr = self.optimizers[0].param_groups[0]['lr']
+        # print('learning rate = %.7f' % lr)
 
     ##
     def optimize(self):
@@ -330,6 +345,7 @@ class Ganomaly2:
                 best_auc = res['AUC']
                 self.save_weights(self.epoch)
             self.visualizer.print_current_performance(res, best_auc)
+            self.update_learning_rate()
         print(">> Training model %s.[Done]" % self.name())
 
     ##

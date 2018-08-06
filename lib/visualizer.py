@@ -163,11 +163,11 @@ class Visualizer():
         """
         reals = self.normalize(reals.cpu().numpy())
         fakes = self.normalize(fakes.cpu().numpy())
-        fixed = self.normalize(fixed.cpu().numpy())
+        # fixed = self.normalize(fixed.cpu().numpy())
 
         self.vis.images(reals, win=1, opts={'title': 'Reals'})
         self.vis.images(fakes, win=2, opts={'title': 'Fakes'})
-        self.vis.images(fixed, win=3, opts={'title': 'Fixed'})
+        # self.vis.images(fixed, win=3, opts={'title': 'Fixed'})
 
     def save_current_images(self, epoch, reals, fakes, fixed):
         """ Save images for epoch i.
