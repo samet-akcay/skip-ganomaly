@@ -151,8 +151,10 @@ class Ganomaly2:
         """
         self.input.data.resize_(input[0].size()).copy_(input[0])
         self.gt.data.resize_(input[1].size()).copy_(input[1])
-        noise = torch.randn(self.noise.size())
-        self.noise.data.copy_(noise)
+
+        # Add Gaussian Noise if requested.
+        if self.opt.add_gaussian_noise:
+            self.noise = self.input.data.new(input[0].size()).normal_(self.opt.mean,self.opt.std)
 
         # Copy the first batch as the fixed input.
         if self.total_steps == self.opt.batchsize:
@@ -168,7 +170,8 @@ class Ganomaly2:
         # --
         # Train with real
         self.label.data.resize_(self.opt.batchsize).fill_(self.real_label)
-        self.out_d_real, self.feat_real = self.netd(self.input)
+        if self.opt.add_gaussian_noise: self.out_d_real, self.feat_real = self.netd(self.input + self.noise)
+        else: self.out_d_real, self.feat_real = self.netd(self.input)
         self.err_d_real = self.bce_criterion(self.out_d_real, self.label)
         self.err_d_real.backward(retain_graph=True)
         # --

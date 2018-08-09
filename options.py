@@ -65,7 +65,7 @@ class Options():
         self.parser.add_argument('--alpha', type=float, default=50, help='Weight for l1 loss. default=500')
         self.parser.add_argument('--lr_policy', type=str, default='lambda', help='lambda|step|plateau')
         self.parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
-        self.parser.add_argument('--add_gaussian_noise', type=bool, default=True, help='Add Gaussian Noise to Input.')
+        self.parser.add_argument('--add_gaussian_noise', type=bool, default=False, help='Add Gaussian Noise to Input.')
         self.parser.add_argument('--mean', type=float, default=0, help='Mean of the Gaussian Noise')
         self.parser.add_argument('--std', type=float, default=0.2, help='Standard deviation of the Gaussian Noise.')
         self.isTrain = True
