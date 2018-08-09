@@ -86,8 +86,8 @@ class Ganomaly2:
         ##
         # Create and initialize networks.
         # self.netg = NetG(self.opt).to(self.device)
-        self.netg = define_G(input_nc=self.opt.nc, output_nc=self.opt.nc, ngf=self.opt.ngf,
-                             which_model_netG='unet_32',
+        self.netg = define_G(opt=self.opt,
+                             which_model_netG='dcgan',
                              norm='batch', use_dropout=False, init_type='normal',
                              gpu_ids=opt.gpu_ids)
         self.netd = NetDv2(self.opt).to(self.device)
@@ -170,14 +170,14 @@ class Ganomaly2:
         # --
         # Train with real
         self.label.data.resize_(self.opt.batchsize).fill_(self.real_label)
-        if self.opt.add_gaussian_noise: self.out_d_real, self.feat_real = self.netd(self.input + self.noise)
-        else: self.out_d_real, self.feat_real = self.netd(self.input)
+        self.out_d_real, self.feat_real = self.netd(self.input)
         self.err_d_real = self.bce_criterion(self.out_d_real, self.label)
         self.err_d_real.backward(retain_graph=True)
         # --
         # Train with fake
         self.label.data.resize_(self.opt.batchsize).fill_(self.fake_label)
-        self.fake = self.netg(self.input + self.noise)
+        if self.opt.add_gaussian_noise: self.fake = self.netg(self.input + self.noise)
+        else: self.fake = self.netg(self.input)
 
         self.out_d_fake, self.feat_fake = self.netd(self.fake.detach())
         self.err_d_fake = self.bce_criterion(self.out_d_fake, self.label)

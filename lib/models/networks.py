@@ -248,6 +248,24 @@ class NetG(nn.Module):
         latent_o = self.encoder2(gen_imag)
         return gen_imag, latent_i, latent_o
 
+##
+class DCGAN(nn.Module):
+    """
+    GENERATOR NETWORK
+    """
+
+    def __init__(self, opt):
+        super(DCGAN, self).__init__()
+        self.encoder1 = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.decoder = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        # self.encoder2 = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+
+    def forward(self, x):
+        latent_i = self.encoder1(x)
+        gen_imag = self.decoder(latent_i)
+        # latent_o = self.encoder2(gen_imag)
+        # return gen_imag, latent_i, latent_o
+        return gen_imag
 
 ###############################################################################
 # Helper Functions
@@ -314,22 +332,24 @@ def init_net(net, init_type='normal', gpu_ids=[]):
     return net
 
 
-def define_G(input_nc, output_nc, ngf, which_model_netG, norm='batch', use_dropout=False, init_type='normal', gpu_ids=[]):
+def define_G(opt, which_model_netG, norm='batch', use_dropout=False, init_type='normal', gpu_ids=[]):
     netG = None
     norm_layer = get_norm_layer(norm_type=norm)
 
     if which_model_netG == 'resnet_9blocks':
-        netG = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
+        netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
     elif which_model_netG == 'resnet_6blocks':
-        netG = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6)
+        netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6)
     elif which_model_netG == 'unet_32':
-        netG = UnetGenerator(input_nc, output_nc, 5, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        netG = UnetGenerator(opt.nc, opt.nc, 5, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif which_model_netG == 'unet_64':
-        netG = UnetGenerator(input_nc, output_nc, 6, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        netG = UnetGenerator(opt.nc, opt.nc, 6, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif which_model_netG == 'unet_128':
-        netG = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        netG = UnetGenerator(opt.nc, opt.nc, 7, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif which_model_netG == 'unet_256':
-        netG = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        netG = UnetGenerator(opt.nc, opt.nc, 8, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    elif which_model_netG == 'dcgan':
+        netG = DCGAN(opt)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % which_model_netG)
     return init_net(netG, init_type, gpu_ids)
