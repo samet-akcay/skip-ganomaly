@@ -1,7 +1,14 @@
+"""
+CREATE DATASETS
+"""
+
+# pylint: disable=C0301,E1101,W0622,C0103,R0902,R0915
+
 import torch.utils.data as data
 import torch
 
 from PIL import Image
+import numpy as np
 import os
 import os.path
 
@@ -118,6 +125,94 @@ class ImageFolder(data.Dataset):
         # TODO: Return these variables in a dict.
         # return img, latentz, index, target
         return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': target}
+
+    def __setitem__(self, index, value):
+        self.noise[index] = value
+
+    def __len__(self):
+        return len(self.imgs)
+
+class CIFAR256(data.Dataset):
+    """[summary]
+
+    Args:
+        data ([type]): [description]
+    """
+    def __init__(self, root, nz=100, transform=None, target_transform=None,
+                 loader=default_loader, split="train"):
+
+        self.root = root
+        self.transform = transform
+        self.target_transform = target_transform
+        self.loader = loader
+        # self.classes = ['abn', 'nrm']
+        # self.class_to_idx = {'abn': 1, 'nrm': 0}
+        self.classes, self.class_to_idx = find_classes(root)
+        self.split = split
+        self.imgs = self.make_dataset(self.root, self.class_to_idx)
+        self.noise = torch.FloatTensor(len(self.imgs), nz, 1, 1).normal_(0, 1)
+
+        if len(self.imgs) == 0:
+            raise(RuntimeError("Found 0 images in subfolders of: " + root + "\n"
+                               "Supported image extensions are: " + ",".join(IMG_EXTENSIONS)))
+
+    def make_dataset(self, dir, class_to_idx):
+        images = []
+        dir = os.path.expanduser(dir)
+        for target in sorted(os.listdir(dir)):
+            d = os.path.join(dir, target)
+            if not os.path.isdir(d):
+                continue
+
+            for root, _, fnames in sorted(os.walk(d)):
+                for fname in sorted(list(set([os.path.splitext(f)[0] for f in fnames]))):
+                    path_img = os.path.join(root, fname + ".tif")
+                    if self.split == "train":
+                        item = (path_img, class_to_idx[target])
+                    elif self.split == "test":
+                        if os.path.exists(os.path.join(root, fname + ".bmp")):
+                            path_pixel_gt = os.path.join(root, fname + ".bmp")
+                        else:
+                            raise FileNotFoundError("Pixel GT not found in test dir.")
+                        item = (path_img, class_to_idx[target], path_pixel_gt)
+                    else:
+                        raise IOError("Unknown split format." +
+                                      "Only train and test splits are supported for UCSD dataset class.")
+                    images.append(item)
+
+        if self.split == 'test':
+            images = [(os.path.split(i[0])[0], os.path.split(i[0])[1], i[1], i[2]) for i in images]
+            images = sorted(images, key=lambda i: i[2])
+            images = [(os.path.join(i[0], i[1]), i[2], i[3]) for i in images]
+
+        return images
+
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: (image, target) where target is class_index of the target class.
+        """
+        if self.split == 'train':
+            path, frame_gt = self.imgs[index]
+            img = self.loader(path)
+            if self.transform is not None:
+                img = self.transform(img)
+            latentz = self.noise[index]
+            # return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': frame_gt}
+            return img, frame_gt
+        else:
+            path, frame_gt, path_pixel_gt = self.imgs[index]
+            img = self.loader(path)
+            latentz = self.noise[index]
+            pixel_gt = self.loader(path_pixel_gt) #TODO need to convert this to tensor.
+            if self.transform is not None:
+                img = self.transform(img)
+                pixel_gt = self.transform(pixel_gt)
+            # return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': frame_gt, 'pixel_gt': pixel_gt}
+            return img, frame_gt
 
     def __setitem__(self, index, value):
         self.noise[index] = value
@@ -345,3 +440,172 @@ class UCSDsw(data.Dataset):
 
     def __len__(self):
         return len(self.imgs)
+
+
+##
+def get_cifar_anomaly_dataset(trn_img, trn_lbl, tst_img, tst_lbl, abn_cls_idx=0):
+    """[summary]
+
+    Arguments:
+        trn_img {np.array} -- Training images
+        trn_lbl {np.array} -- Training labels
+        tst_img {np.array} -- Test     images
+        tst_lbl {np.array} -- Test     labels
+
+    Keyword Arguments:
+        abn_cls_idx {int} -- Anomalous class index (default: {0})
+
+    Returns:
+        [np.array] -- New training-test images and labels.
+    """
+    # Convert train-test labels into numpy array.
+    trn_lbl = np.array(trn_lbl)
+    tst_lbl = np.array(tst_lbl)
+
+    # --
+    # Find idx, img, lbl for abnormal and normal on org dataset.
+    nrm_trn_idx = np.where(trn_lbl != abn_cls_idx)[0]
+    abn_trn_idx = np.where(trn_lbl == abn_cls_idx)[0]
+    nrm_trn_img = trn_img[nrm_trn_idx]    # Normal training images
+    abn_trn_img = trn_img[abn_trn_idx]    # Abnormal training images
+    nrm_trn_lbl = trn_lbl[nrm_trn_idx]    # Normal training labels
+    abn_trn_lbl = trn_lbl[abn_trn_idx]    # Abnormal training labels.
+
+    nrm_tst_idx = np.where(tst_lbl != abn_cls_idx)[0]
+    abn_tst_idx = np.where(tst_lbl == abn_cls_idx)[0]
+    nrm_tst_img = tst_img[nrm_tst_idx]    # Normal training images
+    abn_tst_img = tst_img[abn_tst_idx]    # Abnormal training images.
+    nrm_tst_lbl = tst_lbl[nrm_tst_idx]    # Normal training labels
+    abn_tst_lbl = tst_lbl[abn_tst_idx]    # Abnormal training labels.
+
+    # --
+    # Assign labels to normal (0) and abnormals (1)
+    nrm_trn_lbl[:] = 0
+    nrm_tst_lbl[:] = 0
+    abn_trn_lbl[:] = 1
+    abn_tst_lbl[:] = 1
+
+    # Create new anomaly dataset based on the following data structure:
+    # - anomaly dataset
+    #   . -> train
+    #        . -> normal
+    #   . -> test
+    #        . -> normal
+    #        . -> abnormal
+    new_trn_img = np.copy(nrm_trn_img)
+    new_trn_lbl = np.copy(nrm_trn_lbl)
+    new_tst_img = np.concatenate((nrm_tst_img, abn_trn_img, abn_tst_img), axis=0)
+    new_tst_lbl = np.concatenate((nrm_tst_lbl, abn_trn_lbl, abn_tst_lbl), axis=0)
+
+    return new_trn_img, new_trn_lbl, new_tst_img, new_tst_lbl
+
+##
+def get_mnist_anomaly_dataset(trn_img, trn_lbl, tst_img, tst_lbl, abn_cls_idx=0):
+    """[summary]
+
+    Arguments:
+        trn_img {np.array} -- Training images
+        trn_lbl {np.array} -- Training labels
+        tst_img {np.array} -- Test     images
+        tst_lbl {np.array} -- Test     labels
+
+    Keyword Arguments:
+        abn_cls_idx {int} -- Anomalous class index (default: {0})
+
+    Returns:
+        [np.array] -- New training-test images and labels.
+    """
+    # --
+    # Find normal abnormal indexes.
+    # TODO: PyTorch v0.4 has torch.where function
+    nrm_trn_idx = torch.from_numpy(np.where(trn_lbl.numpy() != abn_cls_idx)[0])
+    abn_trn_idx = torch.from_numpy(np.where(trn_lbl.numpy() == abn_cls_idx)[0])
+    nrm_tst_idx = torch.from_numpy(np.where(tst_lbl.numpy() != abn_cls_idx)[0])
+    abn_tst_idx = torch.from_numpy(np.where(tst_lbl.numpy() == abn_cls_idx)[0])
+
+    # --
+    # Find normal and abnormal images
+    nrm_trn_img = trn_img[nrm_trn_idx]    # Normal training images
+    abn_trn_img = trn_img[abn_trn_idx]    # Abnormal training images.
+    nrm_tst_img = tst_img[nrm_tst_idx]    # Normal training images
+    abn_tst_img = tst_img[abn_tst_idx]    # Abnormal training images.
+
+    # --
+    # Find normal and abnormal labels.
+    nrm_trn_lbl = trn_lbl[nrm_trn_idx]    # Normal training labels
+    abn_trn_lbl = trn_lbl[abn_trn_idx]    # Abnormal training labels.
+    nrm_tst_lbl = tst_lbl[nrm_tst_idx]    # Normal training labels
+    abn_tst_lbl = tst_lbl[abn_tst_idx]    # Abnormal training labels.
+
+    # --
+    # Assign labels to normal (0) and abnormals (1)
+    nrm_trn_lbl[:] = 0
+    nrm_tst_lbl[:] = 0
+    abn_trn_lbl[:] = 1
+    abn_tst_lbl[:] = 1
+
+    # Create new anomaly dataset based on the following data structure:
+    new_trn_img = nrm_trn_img.clone()
+    new_trn_lbl = nrm_trn_lbl.clone()
+    new_tst_img = torch.cat((nrm_tst_img, abn_trn_img, abn_tst_img), dim=0)
+    new_tst_lbl = torch.cat((nrm_tst_lbl, abn_trn_lbl, abn_tst_lbl), dim=0)
+
+    return new_trn_img, new_trn_lbl, new_tst_img, new_tst_lbl
+
+##
+def get_mnist2_anomaly_dataset(trn_img, trn_lbl, tst_img, tst_lbl, nrm_cls_idx=0, proportion=0.1):
+    """ Create mnist 2 anomaly dataset.
+
+    Arguments:
+        trn_img {np.array} -- Training images
+        trn_lbl {np.array} -- Training labels
+        tst_img {np.array} -- Test     images
+        tst_lbl {np.array} -- Test     labels
+
+    Keyword Arguments:
+        nrm_cls_idx {int} -- Anomalous class index (default: {0})
+
+    Returns:
+        [tensor] -- New training-test images and labels.
+    """
+    # --
+    # Find normal abnormal indexes.
+    # TODO: PyTorch v0.4 has torch.where function
+    nrm_trn_idx = torch.from_numpy(np.where(trn_lbl.numpy() == nrm_cls_idx)[0])
+    abn_trn_idx = torch.from_numpy(np.where(trn_lbl.numpy() != nrm_cls_idx)[0])
+    nrm_tst_idx = torch.from_numpy(np.where(tst_lbl.numpy() == nrm_cls_idx)[0])
+    abn_tst_idx = torch.from_numpy(np.where(tst_lbl.numpy() != nrm_cls_idx)[0])
+
+    # Get n percent of the abnormal samples.
+    abn_tst_idx = abn_tst_idx[torch.randperm(len(abn_tst_idx))]
+    abn_tst_idx = abn_tst_idx[:int(len(abn_tst_idx) * proportion)]
+
+
+    # --
+    # Find normal and abnormal images
+    nrm_trn_img = trn_img[nrm_trn_idx]    # Normal training images
+    abn_trn_img = trn_img[abn_trn_idx]    # Abnormal training images.
+    nrm_tst_img = tst_img[nrm_tst_idx]    # Normal training images
+    abn_tst_img = tst_img[abn_tst_idx]    # Abnormal training images.
+
+    # --
+    # Find normal and abnormal labels.
+    nrm_trn_lbl = trn_lbl[nrm_trn_idx]    # Normal training labels
+    abn_trn_lbl = trn_lbl[abn_trn_idx]    # Abnormal training labels.
+    nrm_tst_lbl = tst_lbl[nrm_tst_idx]    # Normal training labels
+    abn_tst_lbl = tst_lbl[abn_tst_idx]    # Abnormal training labels.
+
+    # --
+    # Assign labels to normal (0) and abnormals (1)
+    nrm_trn_lbl[:] = 0
+    nrm_tst_lbl[:] = 0
+    abn_trn_lbl[:] = 1
+    abn_tst_lbl[:] = 1
+
+    # Create new anomaly dataset based on the following data structure:
+    new_trn_img = nrm_trn_img.clone()
+    new_trn_lbl = nrm_trn_lbl.clone()
+    new_tst_img = torch.cat((nrm_tst_img, abn_tst_img), dim=0)
+    new_tst_lbl = torch.cat((nrm_tst_lbl, abn_tst_lbl), dim=0)
+
+    return new_trn_img, new_trn_lbl, new_tst_img, new_tst_lbl
