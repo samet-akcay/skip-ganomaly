@@ -35,9 +35,9 @@ opt = Options().parse()
 # LOAD DATA
 dataloader = load_data(opt)
 
-# ##
-# # LOAD MODEL
-# model = load_model(opt, dataloader)
-# ##
-# # TRAIN MODEL
-# model.train()
+##
+# LOAD MODEL
+model = load_model(opt, dataloader)
+##
+# TRAIN MODEL
+model.train()
