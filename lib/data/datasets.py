@@ -6,7 +6,7 @@ CREATE DATASETS
 
 import torch.utils.data as data
 import torch
-
+from random import shuffle
 from PIL import Image
 import numpy as np
 import os
@@ -125,94 +125,6 @@ class ImageFolder(data.Dataset):
         # TODO: Return these variables in a dict.
         # return img, latentz, index, target
         return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': target}
-
-    def __setitem__(self, index, value):
-        self.noise[index] = value
-
-    def __len__(self):
-        return len(self.imgs)
-
-class CIFAR256(data.Dataset):
-    """[summary]
-
-    Args:
-        data ([type]): [description]
-    """
-    def __init__(self, root, nz=100, transform=None, target_transform=None,
-                 loader=default_loader, split="train"):
-
-        self.root = root
-        self.transform = transform
-        self.target_transform = target_transform
-        self.loader = loader
-        # self.classes = ['abn', 'nrm']
-        # self.class_to_idx = {'abn': 1, 'nrm': 0}
-        self.classes, self.class_to_idx = find_classes(root)
-        self.split = split
-        self.imgs = self.make_dataset(self.root, self.class_to_idx)
-        self.noise = torch.FloatTensor(len(self.imgs), nz, 1, 1).normal_(0, 1)
-
-        if len(self.imgs) == 0:
-            raise(RuntimeError("Found 0 images in subfolders of: " + root + "\n"
-                               "Supported image extensions are: " + ",".join(IMG_EXTENSIONS)))
-
-    def make_dataset(self, dir, class_to_idx):
-        images = []
-        dir = os.path.expanduser(dir)
-        for target in sorted(os.listdir(dir)):
-            d = os.path.join(dir, target)
-            if not os.path.isdir(d):
-                continue
-
-            for root, _, fnames in sorted(os.walk(d)):
-                for fname in sorted(list(set([os.path.splitext(f)[0] for f in fnames]))):
-                    path_img = os.path.join(root, fname + ".tif")
-                    if self.split == "train":
-                        item = (path_img, class_to_idx[target])
-                    elif self.split == "test":
-                        if os.path.exists(os.path.join(root, fname + ".bmp")):
-                            path_pixel_gt = os.path.join(root, fname + ".bmp")
-                        else:
-                            raise FileNotFoundError("Pixel GT not found in test dir.")
-                        item = (path_img, class_to_idx[target], path_pixel_gt)
-                    else:
-                        raise IOError("Unknown split format." +
-                                      "Only train and test splits are supported for UCSD dataset class.")
-                    images.append(item)
-
-        if self.split == 'test':
-            images = [(os.path.split(i[0])[0], os.path.split(i[0])[1], i[1], i[2]) for i in images]
-            images = sorted(images, key=lambda i: i[2])
-            images = [(os.path.join(i[0], i[1]), i[2], i[3]) for i in images]
-
-        return images
-
-    def __getitem__(self, index):
-        """
-        Args:
-            index (int): Index
-
-        Returns:
-            tuple: (image, target) where target is class_index of the target class.
-        """
-        if self.split == 'train':
-            path, frame_gt = self.imgs[index]
-            img = self.loader(path)
-            if self.transform is not None:
-                img = self.transform(img)
-            latentz = self.noise[index]
-            # return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': frame_gt}
-            return img, frame_gt
-        else:
-            path, frame_gt, path_pixel_gt = self.imgs[index]
-            img = self.loader(path)
-            latentz = self.noise[index]
-            pixel_gt = self.loader(path_pixel_gt) #TODO need to convert this to tensor.
-            if self.transform is not None:
-                img = self.transform(img)
-                pixel_gt = self.transform(pixel_gt)
-            # return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': frame_gt, 'pixel_gt': pixel_gt}
-            return img, frame_gt
 
     def __setitem__(self, index, value):
         self.noise[index] = value
