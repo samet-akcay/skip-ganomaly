@@ -5,6 +5,7 @@ from PIL import Image
 import os
 import os.path
 import sys
+from random import shuffle
 
 IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif']
 
@@ -75,7 +76,7 @@ def default_loader(path):
     else:
         return pil_loader(path)
 
-class DatasetFolder(data.Dataset):
+class CALTECH256(data.Dataset):
     """A generic data loader where the samples are arranged in this way: ::
 
         root/class_x/xxx.ext
@@ -165,64 +166,77 @@ class DatasetFolder(data.Dataset):
         return len(self.samples)
 
 
-root = '/home/sam/Projects/gan/ganomaly.v2/data/caltech256/'
-dataset = {}
-trnset = DatasetFolder(root=root)
-tstset = DatasetFolder(root=root)
+# root = '/home/sam/Projects/gan/ganomaly.v2/data/caltech256/'
+# dataset = {}
+# trnset = DatasetFolder(root=root)
+# tstset = DatasetFolder(root=root)
 # dataset['train'] = DatasetFolder(root=root)
 # dataset['test']  = DatasetFolder(root=root)
 
+##
+def get_caltech256_anomaly_dataset(dir, extensions='.jpg', num_inliers=1):
+    """ Create an anomaly detection dataset from CALTECH256.
 
-dir = root
-# def make_dataset(dir, class_to_idx, extensions):
-images = []
-dir = os.path.expanduser(dir)
-class_to_idx = trnset.class_to_idx
-extensions = trnset.extensions
+    Args:
+        dir (str): data directory
+        class_to_idx (dict): classes and indices.
+        extensions (str, optional): Defaults to '.jpg'. File extensions
 
-inlier_idx = 1
-outlier_idx = 257
+    Returns:
+        [type]: [description]
+    """
 
-i_idx = ['001.ak47', '003.backpack', '005.baseball-glove']  # Inlier  idx no
-o_idx = ['257.clutter'] # Outlier idx no
+    dir = os.path.expanduser(dir)
+    # i_cls = ['001.ak47', '003.backpack', '005.baseball-glove']  # Inlier  idx no
+    i_cls = [i for i in os.listdir(dir) if os.path.isdir(os.path.join(dir, i))]
+    shuffle(i_cls)
+    i_cls = i_cls[:num_inliers]
+    o_cls = '257.clutter' # Outlier idx no
 
-# i_class = list(class_to_idx.keys())[list(class_to_idx.values()).index(i_idx - 1)]
-# o_class = list(class_to_idx.keys())[list(class_to_idx.values()).index(o_idx - 1)]
+    o_dirs = os.path.join(dir, o_cls)
+    i_fnames = []
+    i_labels = []
 
-# i_dir = os.path.join(root, i_class)
-# o_dir = os.path.join(root, o_class)
+    for i_idx in sorted(i_cls):
+        i_dir = os.path.join(dir, i_idx)
+        i_fname = [os.path.join(i_dir, i) for i in os.listdir(i_dir) if i.endswith(extensions)]
+        i_fname = i_fname[:150]
+        i_fnames.append(i_fname)
+        i_labels.append([0] * len(i_fname))
+        # i_labels.append([class_to_idx[i_idx]] * len(i_fname))
 
-# o_fnames = [os.path.join(o_dir, i) for i in os.listdir(o_dir) if i.endswith(extensions)]
-# i_fnames = [os.path.join(i_dir, i) for i in os.listdir(i_dir) if i.endswith(extensions)]
+    i_fnames = [item for i_fname in i_fnames for item in i_fname]
+    i_labels = [item for i_label in i_labels for item in i_label]
+    o_fnames = [os.path.join(o_dirs, i) for i in os.listdir(o_dirs) if i.endswith(extensions)]
+    o_labels = [1] * len(o_fnames)
+    # o_labels = [class_to_idx[o_cls]] * len(o_fnames)
 
+    # Split the inliers into train and test set
+    i_idxs = [i for i in range(len(i_fnames))]
+    shuffle(i_idxs)
+    i_trn_idx = i_idxs[: int(len(i_idxs) * 0.8)]
+    i_tst_idx = i_idxs[int(len(i_idxs) * 0.8):]
 
-for target in sorted(i_idx):
-    d = os.path.join(dir, target)
-    print(d)
-    if not os.path.isdir(d):
-        continue
+    i_trn_fnames = [i_fnames[i] for i in i_trn_idx]
+    i_trn_labels = [i_labels[i] for i in i_trn_idx]
+    i_tst_fnames = [i_fnames[i] for i in i_tst_idx]
+    i_tst_labels = [i_labels[i] for i in i_tst_idx]
 
-    for root, _, fnames in sorted(os.walk(d)):
-        fnames = fnames[:150]
-        for fname in sorted(fnames):
-            if has_file_allowed_extension(fname, extensions):
-                path = os.path.join(root, fname)
-                item = (path, class_to_idx[target])
-                images.append(item)
+    # Randomly sub-sample outliers from clutter class.
+    o_tst_idx = [i for i in range(len(o_fnames))]
+    shuffle(o_tst_idx)
+    o_tst_idx = o_tst_idx[: len(i_tst_idx)]
 
+    o_tst_fnames = [o_fnames[i] for i in o_tst_idx]
+    o_tst_labels = [o_labels[i] for i in o_tst_idx]
 
+    # Get training samples
+    trn_smp = [(i_fnames[i], i_labels[i]) for i in i_trn_idx]
 
-for target in sorted(class_to_idx.keys()):
-    d = os.path.join(dir, target)
-    if not os.path.isdir(d):
-        continue
+    # Get test samples.
+    tst_fnames = i_tst_fnames + o_tst_fnames
+    tst_labels = i_tst_labels + o_tst_labels
+    tst_smp = [(tst_fnames[i], tst_labels[i]) for i in range(len(tst_fnames))]
 
-    for root, _, fnames in sorted(os.walk(d)):
-        for fname in sorted(fnames):
-            if has_file_allowed_extension(fname, extensions):
-                path = os.path.join(root, fname)
-                item = (path, class_to_idx[target])
-                images.append(item)
-
-    # return images
-
+    # Return train and test samples.
+    return trn_smp, tst_smp
