@@ -87,7 +87,7 @@ class Ganomaly2:
         # Create and initialize networks.
         # self.netg = NetG(self.opt).to(self.device)
         self.netg = define_G(opt=self.opt,
-                             which_model_netG='dcgan',
+                             which_model_netG=self.opt.which_model_netG,
                              norm='batch', use_dropout=False, init_type='normal',
                              gpu_ids=opt.gpu_ids)
         self.netd = NetDv2(self.opt).to(self.device)

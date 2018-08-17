@@ -256,12 +256,12 @@ class DCGAN(nn.Module):
 
     def __init__(self, opt):
         super(DCGAN, self).__init__()
-        self.encoder1 = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.encoder = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
         self.decoder = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
         # self.encoder2 = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
 
     def forward(self, x):
-        latent_i = self.encoder1(x)
+        latent_i = self.encoder(x)
         gen_imag = self.decoder(latent_i)
         # latent_o = self.encoder2(gen_imag)
         # return gen_imag, latent_i, latent_o
