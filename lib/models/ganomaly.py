@@ -69,8 +69,8 @@ class Ganomaly:
 
         ##
         # Create and initialize networks.
-        # self.netg = NetG(self.opt).to(self.device)
-        self.netg = NetG_32(self.opt.nc, self.opt.nc, self.opt.nz).to(self.device)
+        self.netg = NetG(self.opt).to(self.device)
+        # self.netg = NetG_32(self.opt.nc, self.opt.nc, self.opt.nz).to(self.device)
         self.netd = NetD(self.opt).to(self.device)
         # self.netg.apply(weights_init)
         # self.netd.apply(weights_init)
