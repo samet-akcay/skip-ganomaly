@@ -12,6 +12,7 @@ import numpy as np
 from torchvision.datasets import MNIST
 from torchvision.datasets import CIFAR10
 from torchvision.datasets import ImageFolder
+# from torchvision.datasets import DatasetFolder
 import torchvision.transforms as transforms
 
 
@@ -165,7 +166,8 @@ def load_data(opt):
         return dataloader
 
     elif opt.dataset in ['caltech256']:
-        from .caltech256 import DatasetFolder
+        from .caltech256 import CALTECH256
+        from .caltech256 import get_caltech256_anomaly_dataset
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
         shuffle = {'train': True, 'test': True}
@@ -173,10 +175,14 @@ def load_data(opt):
                                         transforms.CenterCrop(opt.isize),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
-        # dataset = {x: DatasetFolder(os.path.join(opt.dataroot, x), transform) for x in splits}
         dataset= {}
-        dataset['train'] = DatasetFolder(root=opt.dataroot, transform=transform)
-        dataset['test']  = DatasetFolder(root=opt.dataroot, transform=transform)
+        dataset['train'] = CALTECH256(root=opt.dataroot, transform=transform)
+        dataset['test']  = CALTECH256(root=opt.dataroot, transform=transform)
+        dataset['train'].samples, dataset['test'].samples = get_caltech256_anomaly_dataset(
+            dir=dataset['train'].root, num_inliers=1
+        )
+        # dataset['train']
+
         dataloader = {x: torch.utils.data.DataLoader(dataset=dataset[x],
                                                      batch_size=opt.batchsize,
                                                      shuffle=shuffle[x],
