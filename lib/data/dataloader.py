@@ -35,6 +35,46 @@ def load_data(opt):
     if opt.dataroot == '':
         opt.dataroot = './data/{}'.format(opt.dataset)
 
+    ##
+    if opt.dataset in ["UCSD/ped1", "UCSD/ped2"]:
+        # Folder dataset
+        splits = ['train', 'test']
+        drop_last_batch = {'train': True, 'test': False}
+        shuffle = {'train': True, 'test': True}
+        transform = transforms.Compose([transforms.Scale(opt.isize),
+                                        transforms.CenterCrop(opt.isize),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
+        from .datasets import UCSD
+        dataset = {x: UCSD(root=os.path.join(opt.dataroot, x), transform=transform, split=x) \
+                   for x in splits}
+        dataloader = {x: torch.utils.data.DataLoader(dataset=dataset[x],
+                                                     batch_size=opt.batchsize,
+                                                     shuffle=shuffle[x],
+                                                     num_workers=int(opt.workers),
+                                                     drop_last=drop_last_batch[x]) for x in splits}
+
+    elif opt.dataset in ["UCSD.sw/ped1", "UCSD.sw/ped2"]:
+    # elif t == 'txt':
+    # elif opt.dataset.startswith('UCSD'):
+        # Folder dataset
+        splits = ['train', 'test']
+        drop_last_batch = {'train': True, 'test': False}
+        shuffle = {'train': True, 'test': False}
+        transform = transforms.Compose([transforms.Scale(opt.isize),
+                                        transforms.CenterCrop(opt.isize),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
+        from .datasets import UCSDsw
+        dataset = {x: UCSDsw(txt_img=os.path.join(opt.dataroot, x+'.txt'),
+                             txt_lbl=os.path.join(opt.dataroot, 'label.txt'),
+                             transform=transform, split=x) for x in splits}
+        dataloader = {x: torch.utils.data.DataLoader(dataset=dataset[x],
+                                                     batch_size=opt.batchsize,
+                                                     shuffle=shuffle[x],
+                                                     num_workers=int(opt.workers),
+                                                     drop_last=drop_last_batch[x]) for x in splits}
+
     if opt.dataset in ['cifar10']:
         from .datasets import get_cifar_anomaly_dataset
         splits = ['train', 'test']
@@ -136,7 +176,7 @@ def load_data(opt):
             tst_img=dataset['test'].test_data,
             tst_lbl=dataset['test'].test_labels,
             nrm_cls_idx=opt.anomaly_class,
-            proportion=0.1
+            proportion=opt.proportion
         )
 
         dataloader = {x: torch.utils.data.DataLoader(dataset=dataset[x],
