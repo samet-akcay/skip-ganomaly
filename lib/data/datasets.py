@@ -336,7 +336,8 @@ class UCSDsw(data.Dataset):
             if self.transform is not None:
                 img = self.transform(img)
             latentz = self.noise[index]
-            return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': frame_gt}
+            # return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': frame_gt}
+            return img, frame_gt
         else:
             path, frame_gt, path_pixel_gt = self.imgs[index]
             img = self.loader(path)
@@ -345,7 +346,8 @@ class UCSDsw(data.Dataset):
             if self.transform is not None:
                 img = self.transform(img)
                 pixel_gt = self.transform(pixel_gt)
-            return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': frame_gt, 'pixel_gt': pixel_gt}
+            # return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': frame_gt, 'pixel_gt': pixel_gt}
+            return img, frame_gt
 
     def __setitem__(self, index, value):
         self.noise[index] = value
