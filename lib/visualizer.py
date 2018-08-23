@@ -145,7 +145,8 @@ class Visualizer():
         message = '   '
         for key, val in performance.items():
             message += '%s: %.3f ' % (key, val)
-        message += 'max AUC: %.3f' % best
+        # message += 'max AUC: %.3f' % best
+        message += f"max {self.opt.metric}: {best:.3f}"
 
         print(message)
         with open(self.log_name, "a") as log_file:
