@@ -18,7 +18,7 @@ import torchvision.utils as vutils
 from lib.models.networks import NetD, NetDv2, weights_init, define_G, get_scheduler
 from lib.visualizer import Visualizer
 from lib.loss import l2_loss
-from lib.evaluate import roc
+from lib.evaluate import evaluate
 
 ##
 class NetG(nn.Module):
@@ -377,8 +377,8 @@ class Ganomaly2:
             # Train for one epoch
             self.train_epoch()
             res = self.test()
-            if res['AUC'] > best_auc:
-                best_auc = res['AUC']
+            if res[self.opt.metric] > best_auc:
+                best_auc = res[self.opt.metric]
                 self.save_weights(self.epoch, is_best=True)
             self.save_weights(self.epoch)
             self.visualizer.print_current_performance(res, best_auc)
@@ -476,9 +476,11 @@ class Ganomaly2:
             # Scale error vector between [0, 1]
             self.an_scores = (self.an_scores - torch.min(self.an_scores)) / \
                 (torch.max(self.an_scores) - torch.min(self.an_scores))
-            auc, eer = roc(self.gt_labels, self.an_scores)
-            performance = OrderedDict(
-                [('Avg Run Time (ms/batch)', self.times), ('EER', eer), ('AUC', auc)])
+            res = evaluate(self.gt_labels, self.an_scores, metric=self.opt.metric)
+            if len(res) == 2:
+                performance = OrderedDict([('Avg Run Time (ms/batch)', self.times), ('EER', res[1]), (f"{self.opt.metric}", res[0])])
+            else:
+                performance = OrderedDict([('Avg Run Time (ms/batch)', self.times), (f"{self.opt.metric}", res[0])])
 
             if self.opt.display_id > 0 and self.opt.phase == 'test':
                 counter_ratio = float(epoch_iter) / \
