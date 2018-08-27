@@ -20,11 +20,13 @@ class NetG_32(nn.Module):
         self.down2 = DownConv(128, 256)
         self.down3 = DownConv(256, 512)
         self.down4 = DownConv(512, 512)
-        self.bneck = FeatConv(512, nz)
+        # self.bneck = FeatConv(512, nz)
         self.up1 = UpConv(1024, 256)
         self.up2 = UpConv(512, 128)
-        self.up3 = UpConv(256, 64)
-        self.up4 = UpConv(128, 64)
+        self.up3 = OutConv(128, 64)
+        self.up4 = OutConv(64, 64)
+        # self.up3 = UpConv(256, 64)    # TODO This is OutConv
+        # self.up4 = UpConv(128, 64)    # TODO This is OutConv
         self.outc = OutConv(64, n_classes)
 
         # Feature Encoder layers.
@@ -41,12 +43,14 @@ class NetG_32(nn.Module):
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         x5 = self.down4(x4)
-        z = self.bneck(x5)
-        x = self.up1(x5, x4)
-        x = self.up2(x, x3)
-        x = self.up3(x, x2)
-        x = self.up4(x, x1)
-        x = self.outc(x)
+        # z = self.bneck(x5)
+        xu1 = self.up1(x5, x4)
+        xu2 = self.up2(xu1, x3)
+        xu3 = self.up3(xu2) # TODO This is OutConv
+        xu4 = self.up4(xu3) # TODO This is OutConv
+        # xu3 = self.up3(xu2, x2) # TODO This is OutConv
+        # xu4 = self.up4(xu3, x1) # TODO This is OutConv
+        xu5 = self.outc(xu4)
         z_ = self.enc0(x)
         z_ = self.enc1(z_)
         z_ = self.enc2(z_)
@@ -54,7 +58,54 @@ class NetG_32(nn.Module):
         z_ = self.enc4(z_)
         z_ = self.bneck_(z_)
 
-        return x, z, z_
+        # return x, z, z_
+        return xu5, xu4, xu3, xu2, xu1, x5, x4, x3, x2, x1
+
+# class NetG_32(nn.Module):
+#     def __init__(self, n_channels=3, n_classes=3, nz=512):
+#         super(NetG_32, self).__init__()
+
+#         # UNET style Autoencoder layers.
+#         self.inc = InpConv(n_channels, 64)
+#         self.down1 = DownConv(64, 128)
+#         self.down2 = DownConv(128, 256)
+#         self.down3 = DownConv(256, 512)
+#         self.down4 = DownConv(512, 512)
+#         self.bneck = FeatConv(512, nz)
+#         self.up1 = UpConv(1024, 256)
+#         self.up2 = UpConv(512, 128)
+#         self.up3 = UpConv(256, 64)
+#         self.up4 = UpConv(128, 64)
+#         self.outc = OutConv(64, n_classes)
+
+#         # Feature Encoder layers.
+#         self.enc0 = InpConv(n_channels, 64)
+#         self.enc1 = DownConv(64, 128)
+#         self.enc2 = DownConv(128, 256)
+#         self.enc3 = DownConv(256, 512)
+#         self.enc4 = DownConv(512, 512)
+#         self.bneck_ = FeatConv(512, nz)
+
+#     def forward(self, x):
+#         x1 = self.inc(x)
+#         x2 = self.down1(x1)
+#         x3 = self.down2(x2)
+#         x4 = self.down3(x3)
+#         x5 = self.down4(x4)
+#         z = self.bneck(x5)
+#         x = self.up1(x5, x4)
+#         x = self.up2(x, x3)
+#         x = self.up3(x, x2)
+#         x = self.up4(x, x1)
+#         x = self.outc(x)
+#         z_ = self.enc0(x)
+#         z_ = self.enc1(z_)
+#         z_ = self.enc2(z_)
+#         z_ = self.enc3(z_)
+#         z_ = self.enc4(z_)
+#         z_ = self.bneck_(z_)
+
+#         return x, z, z_
 
 class InpConv(nn.Module):
     def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):
