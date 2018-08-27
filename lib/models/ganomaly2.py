@@ -92,8 +92,8 @@ class Ganomaly2:
                              gpu_ids=opt.gpu_ids)
         self.netd = NetDv2(self.opt).to(self.device)
         # self.netd2 = NetDv2(self.opt).to(self.device)
-        self.netg.apply(weights_init)
-        self.netd.apply(weights_init)
+        # self.netg.apply(weights_init)
+        # self.netd.apply(weights_init)
 
         ##
         if self.opt.resume != '':
@@ -468,6 +468,10 @@ class Ganomaly2:
                                       (dst, i+1), normalize=True)
                     vutils.save_image(fake, '%s/fake_%03d.eps' %
                                       (dst, i+1), normalize=True)
+                if self.total_steps % self.opt.save_image_freq == 0:
+                    reals, fakes, fixed = self.get_current_images()
+                    if self.opt.display:
+                        self.visualizer.display_current_images(reals, fakes, fixed, win=5, title='Test')
 
             # Measure inference time.
             self.times = np.array(self.times)
