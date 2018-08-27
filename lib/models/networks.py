@@ -10,6 +10,10 @@ import functools
 from torch.optim import lr_scheduler
 from torch.nn import init
 
+import torch.nn.functional as F
+from collections import OrderedDict
+from torch.nn import init
+import numpy as np
 
 
 ##
@@ -323,12 +327,13 @@ def init_weights(net, init_type='normal', gain=0.02):
     net.apply(init_func)
 
 
-def init_net(net, init_type='normal', gpu_ids=[]):
+def init_net(net, init_type='normal', gpu_ids=[], initialize_weights=True):
     if len(gpu_ids) > 0:
         assert(torch.cuda.is_available())
         net.to(gpu_ids[0])
         net = torch.nn.DataParallel(net, gpu_ids)
-    init_weights(net, init_type)
+    if initialize_weights:
+        init_weights(net, init_type)
     return net
 
 
@@ -336,23 +341,32 @@ def define_G(opt, which_model_netG, norm='batch', use_dropout=False, init_type='
     netG = None
     norm_layer = get_norm_layer(norm_type=norm)
 
-    if which_model_netG == 'resnet_9blocks':
-        netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
-    elif which_model_netG == 'resnet_6blocks':
-        netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6)
-    elif which_model_netG == 'unet_32':
-        netG = UnetGenerator(opt.nc, opt.nc, 5, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    elif which_model_netG == 'unet_64':
-        netG = UnetGenerator(opt.nc, opt.nc, 6, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    elif which_model_netG == 'unet_128':
-        netG = UnetGenerator(opt.nc, opt.nc, 7, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    elif which_model_netG == 'unet_256':
-        netG = UnetGenerator(opt.nc, opt.nc, 8, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    if which_model_netG == 'unet_32':
+        # netG = UnetGenerator(opt.nc, opt.nc, 5, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        netG = NetG_32()
+        return init_net(NetG, init_type, gpu_ids, initialize_weights=False)
     elif which_model_netG == 'dcgan':
         netG = DCGAN(opt)
+        return init_net(netG, init_type, gpu_ids)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % which_model_netG)
-    return init_net(netG, init_type, gpu_ids)
+    # if which_model_netG == 'resnet_9blocks':
+    #     netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
+    # elif which_model_netG == 'resnet_6blocks':
+    #     netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6)
+    # elif which_model_netG == 'unet_32':
+    #     netG = UnetGenerator(opt.nc, opt.nc, 5, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    # elif which_model_netG == 'unet_64':
+    #     netG = UnetGenerator(opt.nc, opt.nc, 6, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    # elif which_model_netG == 'unet_128':
+    #     netG = UnetGenerator(opt.nc, opt.nc, 7, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    # elif which_model_netG == 'unet_256':
+    #     netG = UnetGenerator(opt.nc, opt.nc, 8, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    # elif which_model_netG == 'dcgan':
+    #     netG = DCGAN(opt)
+    # else:
+    #     raise NotImplementedError('Generator model name [%s] is not recognized' % which_model_netG)
+    # return init_net(netG, init_type, gpu_ids)
 
 
 def define_D(input_nc, ndf, which_model_netD,
@@ -650,232 +664,181 @@ class PixelDiscriminator(nn.Module):
     def forward(self, input):
         return self.net(input)
 
-# ##
-# # UNET
+# # # # # # # # # # # # #
+# MY UNET IMPLEMENTATION
+# class NetG_32(nn.Module):
+#     def __init__(self, n_channels=3, n_classes=3, nz=512):
+#         super(NetG_32, self).__init__()
 
-# def conv3x3(in_channels, out_channels, stride=1, 
-#             padding=1, bias=True, groups=1):    
-#     return nn.Conv2d(
-#         in_channels,
-#         out_channels,
-#         kernel_size=3,
-#         stride=stride,
-#         padding=padding,
-#         bias=bias,
-#         groups=groups)
+#         # UNET style Autoencoder layers.
+#         self.inc = InpConv(n_channels, 64)
+#         self.down1 = DownConv(64, 128)
+#         self.down2 = DownConv(128, 256)
+#         self.down3 = DownConv(256, 512)
+#         self.down4 = DownConv(512, 512)
+#         self.bneck = FeatConv(512, nz)
+#         self.up1 = UpConv(1024, 256)
+#         self.up2 = UpConv(512, 128)
+#         self.up3 = UpConv(256, 64)
+#         self.up4 = UpConv(128, 64)
+#         self.outc = OutConv(64, n_classes)
 
-# def upconv2x2(in_channels, out_channels, mode='transpose'):
-#     if mode == 'transpose':
-#         return nn.ConvTranspose2d(
-#             in_channels,
-#             out_channels,
-#             kernel_size=2,
-#             stride=2)
-#     else:
-#         # out_channels is always going to be the same
-#         # as in_channels
-#         return nn.Sequential(
-#             nn.Upsample(mode='bilinear', scale_factor=2),
-#             conv1x1(in_channels, out_channels))
-
-# def conv1x1(in_channels, out_channels, groups=1):
-#     return nn.Conv2d(
-#         in_channels,
-#         out_channels,
-#         kernel_size=1,
-#         groups=groups,
-#         stride=1)
-
-
-# class DownConv(nn.Module):
-#     """
-#     A helper Module that performs 2 convolutions and 1 MaxPool.
-#     A ReLU activation follows each convolution.
-#     """
-#     def __init__(self, in_channels, out_channels, pooling=True):
-#         super(DownConv, self).__init__()
-
-#         self.in_channels = in_channels
-#         self.out_channels = out_channels
-#         self.pooling = pooling
-
-#         self.conv1 = conv3x3(self.in_channels, self.out_channels)
-#         self.conv2 = conv3x3(self.out_channels, self.out_channels)
-
-#         if self.pooling:
-#             self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+#         # Feature Encoder layers.
+#         self.enc0 = InpConv(n_channels, 64)
+#         self.enc1 = DownConv(64, 128)
+#         self.enc2 = DownConv(128, 256)
+#         self.enc3 = DownConv(256, 512)
+#         self.enc4 = DownConv(512, 512)
+#         self.bneck_ = FeatConv(512, nz)
 
 #     def forward(self, x):
-#         x = F.relu(self.conv1(x))
-#         x = F.relu(self.conv2(x))
-#         before_pool = x
-#         if self.pooling:
-#             x = self.pool(x)
-#         return x, before_pool
+#         x1 = self.inc(x)
+#         x2 = self.down1(x1)
+#         x3 = self.down2(x2)
+#         x4 = self.down3(x3)
+#         x5 = self.down4(x4)
+#         z = self.bneck(x5)
+#         x = self.up1(x5, x4)
+#         x = self.up2(x, x3)
+#         x = self.up3(x, x2)
+#         x = self.up4(x, x1)
+#         x = self.outc(x)
+#         z_ = self.enc0(x)
+#         z_ = self.enc1(z_)
+#         z_ = self.enc2(z_)
+#         z_ = self.enc3(z_)
+#         z_ = self.enc4(z_)
+#         z_ = self.bneck_(z_)
 
+#         return x, z, z_
 
-# class UpConv(nn.Module):
-#     """
-#     A helper Module that performs 2 convolutions and 1 UpConvolution.
-#     A ReLU activation follows each convolution.
-#     """
-#     def __init__(self, in_channels, out_channels, 
-#                  merge_mode='concat', up_mode='transpose'):
-#         super(UpConv, self).__init__()
+class NetG_32(nn.Module):
+    def __init__(self, n_channels=3, n_classes=3, nz=512):
+        super(NetG_32, self).__init__()
 
-#         self.in_channels = in_channels
-#         self.out_channels = out_channels
-#         self.merge_mode = merge_mode
-#         self.up_mode = up_mode
+        # UNET style Autoencoder layers.
+        self.inc = InpConv(n_channels, 64)
+        self.down1 = DownConv(64, 128)
+        self.down2 = DownConv(128, 256)
+        self.down3 = DownConv(256, 512)
+        self.down4 = DownConv(512, 512)
+        # self.bneck = FeatConv(512, nz)
+        self.up1 = UpConv(1024, 256)
+        self.up2 = UpConv(512, 128)
+        self.up3 = OutConv(128, 64)
+        self.up4 = OutConv(64, 64)
+        # self.up3 = UpConv(256, 64)    # TODO This is OutConv
+        # self.up4 = UpConv(128, 64)    # TODO This is OutConv
+        self.outc = OutConv(64, n_classes)
 
-#         self.upconv = upconv2x2(self.in_channels, self.out_channels, 
-#             mode=self.up_mode)
+        # # Feature Encoder layers.
+        # self.enc0 = InpConv(n_channels, 64)
+        # self.enc1 = DownConv(64, 128)
+        # self.enc2 = DownConv(128, 256)
+        # self.enc3 = DownConv(256, 512)
+        # self.enc4 = DownConv(512, 512)
+        # self.bneck_ = FeatConv(512, nz)
 
-#         if self.merge_mode == 'concat':
-#             self.conv1 = conv3x3(
-#                 2*self.out_channels, self.out_channels)
-#         else:
-#             # num of input channels to conv2 is same
-#             self.conv1 = conv3x3(self.out_channels, self.out_channels)
-#         self.conv2 = conv3x3(self.out_channels, self.out_channels)
+    def forward(self, x):
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        # z = self.bneck(x5)
+        x = self.up1(x5, x4)
+        x = self.up2(x, x3)
+        x = self.up3(x) # TODO This is OutConv
+        x = self.up4(x) # TODO This is OutConv
+        # xu3 = self.up3(xu2, x2) # TODO This is OutConv
+        # xu4 = self.up4(xu3, x1) # TODO This is OutConv
+        xu5 = self.outc(x)
+        # z_ = self.enc0(x)
+        # z_ = self.enc1(z_)
+        # z_ = self.enc2(z_)
+        # z_ = self.enc3(z_)
+        # z_ = self.enc4(z_)
+        # z_ = self.bneck_(z_)
 
+        # return x, z, z_
+        # return xu5, xu4, xu3, xu2, xu1, x5, x4, x3, x2, x1
+        return x
 
-#     def forward(self, from_down, from_up):
-#         """ Forward pass
-#         Arguments:
-#             from_down: tensor from the encoder pathway
-#             from_up: upconv'd tensor from the decoder pathway
-#         """
-#         from_up = self.upconv(from_up)
-#         if self.merge_mode == 'concat':
-#             x = torch.cat((from_up, from_down), 1)
-#         else:
-#             x = from_up + from_down
-#         x = F.relu(self.conv1(x))
-#         x = F.relu(self.conv2(x))
-#         return x
+class InpConv(nn.Module):
+    def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):
+        super(InpConv, self).__init__()
+        self.iconv = nn.Conv2d(inp_chn, out_chn, kernel_size=kernel_size, stride=stride, padding=padding)
+    def forward(self, x):
+        x = self.iconv(x)
+        return x
 
+class DownConv(nn.Module):
+    def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):
+        super(DownConv, self).__init__()
+        self.dconv = nn.Sequential(
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(inp_chn, out_chn, kernel_size=kernel_size, stride=stride, padding=padding),
+            nn.BatchNorm2d(out_chn, eps=1e-5, momentum=0.1, affine=True)
+        )
+    def forward(self, x):
+        x = self.dconv(x)
+        return x
 
-# class UNet(nn.Module):
-#     """ `UNet` class is based on https://arxiv.org/abs/1505.04597
-#     The U-Net is a convolutional encoder-decoder neural network.
-#     Contextual spatial information (from the decoding,
-#     expansive pathway) about an input tensor is merged with
-#     information representing the localization of details
-#     (from the encoding, compressive pathway).
-#     Modifications to the original paper:
-#     (1) padding is used in 3x3 convolutions to prevent loss
-#         of border pixels
-#     (2) merging outputs does not require cropping due to (1)
-#     (3) residual connections can be used by specifying
-#         UNet(merge_mode='add')
-#     (4) if non-parametric upsampling is used in the decoder
-#         pathway (specified by upmode='upsample'), then an
-#         additional 1x1 2d convolution occurs after upsampling
-#         to reduce channel dimensionality by a factor of 2.
-#         This channel halving happens with the convolution in
-#         the tranpose convolution (specified by upmode='transpose')
-#     """
+class UpConv(nn.Module):
+    def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1, bilinear=False):
+        super(UpConv, self).__init__()
+        if bilinear:
+            self.upconv = nn.Upsample(scale_factor=2, mode='bilinear')
+            # self.uconv = nn.Sequential(
+            #     nn.ReLU(inplace=True),
+            #     nn.Upsample(scale_factor=2, mode='bilinear'),
+            #     nn.BatchNorm2d(num_features=inp_chn//2, eps=1e-5, momentum=0.1, affine=True)
+            # )
+        else:
+            self.upconv = nn.ConvTranspose2d(inp_chn//2, inp_chn//2, 2, stride=2)
+            # self.upconv = nn.Sequential(
+            #     nn.ReLU(inplace=True),
+            #     nn.ConvTranspose2d(inp_chn//2, inp_chn//2, kernel_size=4, stride=2, padding=1),
+            #     nn.BatchNorm2d(num_features=inp_chn//2, eps=1e-5, momentum=0.1, affine=True)
+            # )
 
-#     def __init__(self, num_classes, in_channels=3, depth=5, 
-#                  start_filts=64, up_mode='transpose', 
-#                  merge_mode='concat'):
-#         """
-#         Arguments:
-#             in_channels: int, number of channels in the input tensor.
-#                 Default is 3 for RGB images.
-#             depth: int, number of MaxPools in the U-Net.
-#             start_filts: int, number of convolutional filters for the 
-#                 first conv.
-#             up_mode: string, type of upconvolution. Choices: 'transpose'
-#                 for transpose convolution or 'upsample' for nearest neighbour
-#                 upsampling.
-#         """
-#         super(UNet, self).__init__()
+        # self.conv = DoubleConv(inp_chn, out_chn)
+        self.conv = nn.Sequential(
+            nn.Conv2d(inp_chn, out_chn, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(out_chn),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_chn, out_chn, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(out_chn),
+            nn.ReLU(inplace=True)
+        )
 
-#         if up_mode in ('transpose', 'upsample'):
-#             self.up_mode = up_mode
-#         else:
-#             raise ValueError("\"{}\" is not a valid mode for "
-#                              "upsampling. Only \"transpose\" and "
-#                              "\"upsample\" are allowed.".format(up_mode))
-    
-#         if merge_mode in ('concat', 'add'):
-#             self.merge_mode = merge_mode
-#         else:
-#             raise ValueError("\"{}\" is not a valid mode for"
-#                              "merging up and down paths. "
-#                              "Only \"concat\" and "
-#                              "\"add\" are allowed.".format(up_mode))
+    def forward(self, x1, x2):
+        x1 = self.upconv(x1)
+        diffX = x1.size()[2] - x2.size()[2]
+        diffY = x1.size()[3] - x2.size()[3]
+        x2 = F.pad(x2, (diffX // 2, int(diffX / 2),
+                        diffY // 2, int(diffY / 2)))
+        x = torch.cat([x2, x1], dim=1)
+        x = self.conv(x)
+        return x
 
-#         # NOTE: up_mode 'upsample' is incompatible with merge_mode 'add'
-#         if self.up_mode == 'upsample' and self.merge_mode == 'add':
-#             raise ValueError("up_mode \"upsample\" is incompatible "
-#                              "with merge_mode \"add\" at the moment "
-#                              "because it doesn't make sense to use "
-#                              "nearest neighbour to reduce "
-#                              "depth channels (by half).")
+class FeatConv(nn.Module):
+    def __init__(self, inp_chn, out_chn):
+        super(FeatConv, self).__init__()
+        self.featconv = nn.Conv2d(inp_chn, out_chn, kernel_size=3, stride=1, padding=1)
 
-#         self.num_classes = num_classes
-#         self.in_channels = in_channels
-#         self.start_filts = start_filts
-#         self.depth = depth
+    def forward(self, x):
+        x = self.featconv(x)
+        return x
 
-#         self.down_convs = []
-#         self.up_convs = []
-
-#         # create the encoder pathway and add to a list
-#         for i in range(depth):
-#             ins = self.in_channels if i == 0 else outs
-#             outs = self.start_filts*(2**i)
-#             pooling = True if i < depth-1 else False
-
-#             down_conv = DownConv(ins, outs, pooling=pooling)
-#             self.down_convs.append(down_conv)
-
-#         # create the decoder pathway and add to a list
-#         # - careful! decoding only requires depth-1 blocks
-#         for i in range(depth-1):
-#             ins = outs
-#             outs = ins // 2
-#             up_conv = UpConv(ins, outs, up_mode=up_mode,
-#                 merge_mode=merge_mode)
-#             self.up_convs.append(up_conv)
-
-#         self.conv_final = conv1x1(outs, self.num_classes)
-
-#         # add the list of modules to current module
-#         self.down_convs = nn.ModuleList(self.down_convs)
-#         self.up_convs = nn.ModuleList(self.up_convs)
-
-#         self.reset_params()
-
-#     @staticmethod
-#     def weight_init(m):
-#         if isinstance(m, nn.Conv2d):
-#             init.xavier_normal(m.weight)
-#             init.constant(m.bias, 0)
-
-
-#     def reset_params(self):
-#         for i, m in enumerate(self.modules()):
-#             self.weight_init(m)
-
-
-#     def forward(self, x):
-#         encoder_outs = []
-
-#         # encoder pathway, save outputs for merging
-#         for i, module in enumerate(self.down_convs):
-#             x, before_pool = module(x)
-#             encoder_outs.append(before_pool)
-
-#         for i, module in enumerate(self.up_convs):
-#             before_pool = encoder_outs[-(i+2)]
-#             x = module(before_pool, x)
-
-#         # No softmax is used. This means you need to use
-#         # nn.CrossEntropyLoss is your training script,
-#         # as this module includes a softmax already.
-#         x = self.conv_final(x)
-#         return x
+class OutConv(nn.Module):
+    def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):
+        super(OutConv, self).__init__()
+        self.oconv = nn.Sequential(
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(inp_chn, out_chn, kernel_size=kernel_size, stride=stride, padding=padding),
+            nn.Tanh()
+        )
+    def forward(self, x):
+        x = self.oconv(x)
+        return x
