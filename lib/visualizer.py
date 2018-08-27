@@ -152,7 +152,7 @@ class Visualizer():
         with open(self.log_name, "a") as log_file:
             log_file.write('%s\n' % message)
 
-    def display_current_images(self, reals, fakes, fixed):
+    def display_current_images(self, reals, fakes, fixed, win=0, title='Train'):
         """ Display current images.
 
         Args:
@@ -166,9 +166,10 @@ class Visualizer():
         fakes = self.normalize(fakes.cpu().numpy())
         # fixed = self.normalize(fixed.cpu().numpy())
 
-        self.vis.images(reals, win=1, opts={'title': 'Reals'})
-        self.vis.images(fakes, win=2, opts={'title': 'Fakes'})
+        self.vis.images(reals, win=win+1, opts={'title': f'{title} Reals'})
+        self.vis.images(fakes, win=win+2, opts={'title': f'{title} Fakes'})
         # self.vis.images(fixed, win=3, opts={'title': 'Fixed'})
+
 
     def save_current_images(self, epoch, reals, fakes, fixed):
         """ Save images for epoch i.
