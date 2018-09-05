@@ -341,32 +341,33 @@ def define_G(opt, which_model_netG, norm='batch', use_dropout=False, init_type='
     netG = None
     norm_layer = get_norm_layer(norm_type=norm)
 
-    if which_model_netG == 'unet_32':
-        # netG = UnetGenerator(opt.nc, opt.nc, 5, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-        netG = NetG_32()
-        return init_net(NetG, init_type, gpu_ids, initialize_weights=False)
-    elif which_model_netG == 'dcgan':
-        netG = DCGAN(opt)
-        return init_net(netG, init_type, gpu_ids)
-    else:
-        raise NotImplementedError('Generator model name [%s] is not recognized' % which_model_netG)
-    # if which_model_netG == 'resnet_9blocks':
-    #     netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
-    # elif which_model_netG == 'resnet_6blocks':
-    #     netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6)
-    # elif which_model_netG == 'unet_32':
-    #     netG = UnetGenerator(opt.nc, opt.nc, 5, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    # elif which_model_netG == 'unet_64':
-    #     netG = UnetGenerator(opt.nc, opt.nc, 6, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    # elif which_model_netG == 'unet_128':
-    #     netG = UnetGenerator(opt.nc, opt.nc, 7, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    # elif which_model_netG == 'unet_256':
-    #     netG = UnetGenerator(opt.nc, opt.nc, 8, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    # if which_model_netG == 'unet_32':
+    #     # netG = UnetGenerator(opt.nc, opt.nc, 5, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    #     netG = NetG_32().to(gpu_ids[0])
+    #     return netG
+    #     # return init_net(NetG, init_type, gpu_ids, initialize_weights=False)
     # elif which_model_netG == 'dcgan':
     #     netG = DCGAN(opt)
+    #     return init_net(netG, init_type, gpu_ids)
     # else:
     #     raise NotImplementedError('Generator model name [%s] is not recognized' % which_model_netG)
-    # return init_net(netG, init_type, gpu_ids)
+    if which_model_netG == 'resnet_9blocks':
+        netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
+    elif which_model_netG == 'resnet_6blocks':
+        netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6)
+    elif which_model_netG == 'unet_32':
+        netG = UnetGenerator(opt.nc, opt.nc, 5, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    elif which_model_netG == 'unet_64':
+        netG = UnetGenerator(opt.nc, opt.nc, 6, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    elif which_model_netG == 'unet_128':
+        netG = UnetGenerator(opt.nc, opt.nc, 7, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    elif which_model_netG == 'unet_256':
+        netG = UnetGenerator(opt.nc, opt.nc, 8, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    elif which_model_netG == 'dcgan':
+        netG = DCGAN(opt)
+    else:
+        raise NotImplementedError('Generator model name [%s] is not recognized' % which_model_netG)
+    return init_net(netG, init_type, gpu_ids)
 
 
 def define_D(input_nc, ndf, which_model_netD,
@@ -762,7 +763,7 @@ class NetG_32(nn.Module):
 
         # return x, z, z_
         # return xu5, xu4, xu3, xu2, xu1, x5, x4, x3, x2, x1
-        return x
+        return xu5
 
 class InpConv(nn.Module):
     def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):
@@ -776,7 +777,7 @@ class DownConv(nn.Module):
     def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):
         super(DownConv, self).__init__()
         self.dconv = nn.Sequential(
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.LeakyReLU(negative_slope=0.2),
             nn.Conv2d(inp_chn, out_chn, kernel_size=kernel_size, stride=stride, padding=padding),
             nn.BatchNorm2d(out_chn, eps=1e-5, momentum=0.1, affine=True)
         )
@@ -790,14 +791,14 @@ class UpConv(nn.Module):
         if bilinear:
             self.upconv = nn.Upsample(scale_factor=2, mode='bilinear')
             # self.uconv = nn.Sequential(
-            #     nn.ReLU(inplace=True),
+            #     nn.ReLU(),
             #     nn.Upsample(scale_factor=2, mode='bilinear'),
             #     nn.BatchNorm2d(num_features=inp_chn//2, eps=1e-5, momentum=0.1, affine=True)
             # )
         else:
             self.upconv = nn.ConvTranspose2d(inp_chn//2, inp_chn//2, 2, stride=2)
             # self.upconv = nn.Sequential(
-            #     nn.ReLU(inplace=True),
+            #     nn.ReLU(),
             #     nn.ConvTranspose2d(inp_chn//2, inp_chn//2, kernel_size=4, stride=2, padding=1),
             #     nn.BatchNorm2d(num_features=inp_chn//2, eps=1e-5, momentum=0.1, affine=True)
             # )
@@ -806,10 +807,10 @@ class UpConv(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(inp_chn, out_chn, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(out_chn),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Conv2d(out_chn, out_chn, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(out_chn),
-            nn.ReLU(inplace=True)
+            nn.ReLU()
         )
 
     def forward(self, x1, x2):
@@ -835,7 +836,7 @@ class OutConv(nn.Module):
     def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):
         super(OutConv, self).__init__()
         self.oconv = nn.Sequential(
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.ConvTranspose2d(inp_chn, out_chn, kernel_size=kernel_size, stride=stride, padding=padding),
             nn.Tanh()
         )
