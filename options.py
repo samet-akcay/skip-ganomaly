@@ -40,7 +40,7 @@ class Options():
         self.parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         self.parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
         self.parser.add_argument('--name', type=str, default='experiment_name', help='name of the experiment')
-        self.parser.add_argument('--model', type=str, default='ganomaly', help='chooses which model to use. ganomaly')
+        self.parser.add_argument('--model', type=str, default='ganomaly2', help='chooses which model to use. ganomaly')
         self.parser.add_argument('--display_server', type=str, default="http://localhost", help='visdom server of the web display')
         self.parser.add_argument('--display_port', type=int, default=8097, help='visdom port of the web display')
         self.parser.add_argument('--display_id', type=int, default=0, help='window id of the web display')
