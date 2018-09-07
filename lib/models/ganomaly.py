@@ -327,7 +327,21 @@ class Ganomaly:
                 self.set_input(data)
                 self.fake, latent_i, latent_o = self.netg(self.input)
 
-                error = torch.mean(torch.pow((latent_i-latent_o), 2), dim=1)
+                # # Calculate the anomaly score.
+                # si = self.input.size()
+                # sz = self.feat_real.size()
+                # rec = (self.input - self.fake).view(si[0], si[1] * si[2] * si[3])
+                # lat = (self.feat_real - self.feat_fake).view(sz[0], sz[1] * sz[2] * sz[3])
+                # rec = torch.mean(torch.sqrt(torch.pow(rec, 2)), dim=1)
+                # lat = torch.mean(torch.sqrt(torch.pow(lat, 2)), dim=1)
+                # # error = 0.9*rec + 0.1*lat
+                # error = lat + rec
+                # # error = lat
+                e1 = torch.mean(torch.mean(torch.mean(torch.abs(self.input - self.fake), dim=1), dim=1), dim=1).reshape(self.input.size(0), 1, 1)
+                e2 = torch.mean(torch.sqrt(torch.pow((latent_i-latent_o), 2)), dim=1)
+                # error = e2
+                error = e1 + e2
+                # error = torch.mean(torch.pow((latent_i-latent_o), 2), dim=1)
                 time_o = time.time()
 
                 self.an_scores[i*self.opt.batchsize : i*self.opt.batchsize+error.size(0)] = error.reshape(error.size(0))
