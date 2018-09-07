@@ -424,7 +424,7 @@ class Ganomaly2:
                 self.total_steps += self.opt.batchsize
                 epoch_iter += self.opt.batchsize
                 time_i = time.time()
-                
+
                 # Forward - Pass
                 self.set_input(data)
                 self.fake = self.netg(self.input)
@@ -438,9 +438,10 @@ class Ganomaly2:
                 sz = self.feat_real.size()
                 rec = (self.input - self.fake).view(si[0], si[1] * si[2] * si[3])
                 lat = (self.feat_real - self.feat_fake).view(sz[0], sz[1] * sz[2] * sz[3])
-                rec = torch.mean(torch.pow(rec, 2), dim=1)
-                lat = torch.mean(torch.pow(lat, 2), dim=1)
+                rec = torch.mean(torch.sqrt(torch.pow(rec, 2)), dim=1)
+                lat = torch.mean(torch.sqrt(torch.pow(lat, 2)), dim=1)
                 error = 0.9*rec + 0.1*lat
+                # error = lat + rec
 
                 time_o = time.time()
 
