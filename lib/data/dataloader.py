@@ -41,7 +41,7 @@ def load_data(opt):
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
         shuffle = {'train': True, 'test': True}
-        transform = transforms.Compose([transforms.Scale(opt.isize),
+        transform = transforms.Compose([transforms.Resize(opt.isize),
                                         transforms.CenterCrop(opt.isize),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
@@ -61,7 +61,7 @@ def load_data(opt):
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
         shuffle = {'train': True, 'test': False}
-        transform = transforms.Compose([transforms.Scale(opt.isize),
+        transform = transforms.Compose([transforms.Resize(opt.isize),
                                         transforms.CenterCrop(opt.isize),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
@@ -83,7 +83,7 @@ def load_data(opt):
 
         transform = transforms.Compose(
             [
-                transforms.Scale(opt.isize),
+                transforms.Resize(opt.isize),
                 transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             ]
@@ -124,7 +124,7 @@ def load_data(opt):
 
         transform = transforms.Compose(
             [
-                transforms.Scale(opt.isize),
+                transforms.Resize(opt.isize),
                 transforms.ToTensor(),
                 transforms.Normalize((0.1307,), (0.3081,))
             ]
@@ -159,7 +159,7 @@ def load_data(opt):
 
         transform = transforms.Compose(
             [
-                transforms.Scale(opt.isize),
+                transforms.Resize(opt.isize),
                 transforms.ToTensor(),
                 transforms.Normalize((0.1307,), (0.3081,))
             ]
@@ -191,7 +191,7 @@ def load_data(opt):
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
         shuffle = {'train': True, 'test': True}
-        transform = transforms.Compose([transforms.Scale(opt.isize),
+        transform = transforms.Compose([transforms.Resize(opt.isize),
                                         transforms.CenterCrop(opt.isize),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
@@ -211,7 +211,7 @@ def load_data(opt):
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
         shuffle = {'train': True, 'test': True}
-        transform = transforms.Compose([transforms.Scale(opt.isize),
+        transform = transforms.Compose([transforms.Resize(opt.isize),
                                         transforms.CenterCrop(opt.isize),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
@@ -234,7 +234,7 @@ def load_data(opt):
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
         shuffle = {'train': True, 'test': True}
-        transform = transforms.Compose([transforms.Scale(opt.isize),
+        transform = transforms.Compose([transforms.Resize(opt.isize),
                                         transforms.CenterCrop(opt.isize),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])

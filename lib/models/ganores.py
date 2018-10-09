@@ -42,15 +42,15 @@ class NetG(nn.Module):
 ##
 
 
-class Ganomaly2:
+class Ganores:
     """GANomaly Class
     """
 
     def __init__(self, opt, dataloader=None):
-        super(Ganomaly2, self).__init__()
+        super(Ganores, self).__init__()
         ##
         # Initalize variables.
-        self.name = 'ganomaly2'
+        self.name = 'Ganores'
         self.opt = opt
         self.visualizer = Visualizer(opt)
         self.dataloader = dataloader
@@ -90,7 +90,7 @@ class Ganomaly2:
                              which_model_netG=self.opt.which_model_netG,
                              norm='batch', use_dropout=False, init_type='normal',
                              gpu_ids=opt.gpu_ids)
-        self.netd = NetD(self.opt).to(self.device)
+        self.netd = NetDv2(self.opt).to(self.device)
         # self.netd2 = NetDv2(self.opt).to(self.device)
         # self.netg.apply(weights_init)
         # self.netd.apply(weights_init)
