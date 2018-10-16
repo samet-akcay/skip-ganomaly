@@ -87,7 +87,7 @@ class Ganomaly2:
         # Create and initialize networks.
         # self.netg = NetG(self.opt).to(self.device)
         self.netg = define_G(opt=self.opt,
-                             which_model_netG=self.opt.which_model_netG,
+                             which_model_netG=self.opt.netG,
                              norm='batch', use_dropout=False, init_type='normal',
                              gpu_ids=opt.gpu_ids)
         self.netd = NetD(self.opt).to(self.device)
@@ -353,8 +353,7 @@ class Ganomaly2:
 
             if self.total_steps % self.opt.save_image_freq == 0:
                 reals, fakes, fixed = self.get_current_images()
-                self.visualizer.save_current_images(
-                    self.epoch, reals, fakes, fixed)
+                self.visualizer.save_current_images(self.epoch, reals, fakes, fixed)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes, fixed)
 

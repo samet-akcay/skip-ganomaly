@@ -96,9 +96,10 @@ def define_D(opt):
     norm_layer = get_norm_layer(norm_type=opt.norm)
 
     if opt.netD == 'basic':
-        net = NLayerDiscriminator(opt.nc, opt.ndf, n_layers=3, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
-    elif opt.netD == 'n_layers':
-        net = NLayerDiscriminator(opt.nc, opt.ndf, opt.n_layers_D, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
+        # net = NLayerDiscriminator(opt.nc, opt.ndf, n_layers=3, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
+        net = NLayerDiscriminator(opt)
+    # elif opt.netD == 'n_layers':
+    #     net = NLayerDiscriminator(opt.nc, opt.ndf, opt.n_layers_D, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
     elif opt.netD == 'pixel':
         net = PixelDiscriminator(opt.nc, opt.ndf, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
     else:
@@ -314,8 +315,17 @@ class UnetSkipConnectionBlock(nn.Module):
 
 # Defines the PatchGAN discriminator with the specified arguments.
 class NLayerDiscriminator(nn.Module):
-    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False):
+    # def __init__(self, opt, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False):
+    def __init__(self, opt):
         super(NLayerDiscriminator, self).__init__()
+
+        # Input Parameters.
+        input_nc = opt.nc
+        ndf = opt.ndf
+        n_layers = int(np.log2(opt.isize))
+        norm_layer = get_norm_layer(norm_type=opt.norm)
+        use_sigmoid = opt.use_sigmoid
+
         if type(norm_layer) == functools.partial:
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
@@ -340,20 +350,17 @@ class NLayerDiscriminator(nn.Module):
                 nn.LeakyReLU(0.2, True)
             ]
 
-        nf_mult_prev = nf_mult
-        nf_mult = min(2**n_layers, 8)
-        sequence += [
-            nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult,
-                      kernel_size=kw, stride=1, padding=padw, bias=use_bias),
-            norm_layer(ndf * nf_mult),
-            nn.LeakyReLU(0.2, True)
-        ]
-        # TODO: Here add self.features or something.
-        # sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]
-        classifier = [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]
-        if use_sigmoid:
-            # sequence += [nn.Sigmoid()]
-            classifier += [nn.Sigmoid()]
+        # nf_mult_prev = nf_mult
+        # nf_mult = min(2**n_layers, 8)
+        # sequence += [
+        #     nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult,
+        #               kernel_size=kw, stride=1, padding=padw, bias=use_bias),
+        #     norm_layer(ndf * nf_mult),
+        #     nn.LeakyReLU(0.2, True)
+        # ]
+        classifier = [nn.Conv2d(ndf * nf_mult, 1, kernel_size=3, stride=1, padding=padw)]
+        # if use_sigmoid:
+        classifier += [nn.Sigmoid()]
 
         # self.model = nn.Sequential(*sequence)
         self.features = nn.Sequential(*sequence)
@@ -362,7 +369,7 @@ class NLayerDiscriminator(nn.Module):
     def forward(self, input):
         # return self.model(input)
         features = self.features(input)
-        classifier = self.classifier(features)
+        classifier = self.classifier(features).view(-1, 1).squeeze(1)
         return classifier, features
 
 
