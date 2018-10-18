@@ -23,6 +23,7 @@ from lib.models.networksv2 import define_D, define_G, init_net
 from lib.visualizer import Visualizer
 from lib.loss import l2_loss
 from lib.evaluate import roc
+from lib.evaluate import evaluate
 
 ##
 class Ganomaly3:
@@ -44,21 +45,16 @@ class Ganomaly3:
         # -- Discriminator attributes.
         self.out_d_real = None
         self.feat_real = None
-        self.err_d_real = None
+        # self.err_d_real = None
         self.fake = None
         self.latent_i = None
         self.latent_o = None
         self.out_d_fake = None
         self.feat_fake = None
-        self.err_d_fake = None
-        self.err_d = None
-
-        # -- Generator attributes.
-        self.out_g = None
-        self.err_g_bce = None
-        self.err_g_l1l = None
-        self.err_g_enc = None
-        self.err_g = None
+        # self.err_d_fake = None
+        # self.err_d = None
+        self.loss_d = {'disc': None, 'real': None, 'fake': None}
+        self.loss_g = {'gen': None, 'bce': None, 'rec': None}
 
         # -- Misc attributes
         self.epoch = 0
@@ -128,19 +124,23 @@ class Ganomaly3:
         # Train with real
         self.label.data.resize_(self.opt.batchsize).fill_(self.real_label)
         self.out_d_real, self.feat_real = self.netd(self.input)
-        self.err_d_real = self.bce_criterion(self.out_d_real, self.label)
-        self.err_d_real.backward()
+        # self.err_d_real = self.bce_criterion(self.out_d_real, self.label)
+        # self.err_d_real.backward()
+        self.loss_d['real'] = self.bce_criterion(self.out_d_real, self.label)
+        self.loss_d['real'].backward()
         # --
         # Train with fake
         self.label.data.resize_(self.opt.batchsize).fill_(self.fake_label)
         # self.fake, self.latent_i, self.latent_o = self.netg(self.input)
         self.fake = self.netg(self.input + self.noise)
-
         self.out_d_fake, self.feat_fake = self.netd(self.fake.detach())
-        self.err_d_fake = self.bce_criterion(self.out_d_fake, self.label)
+
+        self.loss_d['fake'] = self.bce_criterion(self.out_d_fake, self.label)
+        self.loss_d['fake'].backward()
+        self.loss_d['disc'] = self.loss_d['real'] + self.loss_d['fake']
+
         # --
-        self.err_d_fake.backward()
-        self.err_d = self.err_d_real + self.err_d_fake
+        
         self.optimizer_d.step()
 
     ##
@@ -163,13 +163,19 @@ class Ganomaly3:
         self.label.data.resize_(self.opt.batchsize).fill_(self.real_label)
         self.out_g, _ = self.netd(self.fake)
 
-        self.err_g_bce = self.bce_criterion(self.out_g, self.label)
-        self.err_g_l1l = self.l1l_criterion(self.fake, self.input)  # constrain x' to look like x
+        # self.err_g_bce = self.bce_criterion(self.out_g, self.label)
+        # self.err_g_l1l = self.l1l_criterion(self.fake, self.input)  # constrain x' to look like x
         # self.err_g_enc = self.l2l_criterion(self.latent_o, self.latent_i)
         # self.err_g = self.err_g_bce + self.err_g_l1l * self.opt.alpha + self.err_g_enc
-        self.err_g = self.err_g_bce + self.err_g_l1l * self.opt.alpha
+        # self.err_g = self.err_g_bce + self.err_g_l1l * self.opt.alpha
+        # self.err_g.backward(retain_graph=True)
 
-        self.err_g.backward(retain_graph=True)
+        # Error-G (e_g) & Loss-G (l_g)
+        self.loss_g['bce'] = self.opt.w_bce * self.bce_criterion(self.out_g, self.label)
+        self.loss_g['rec'] = self.opt.w_rec * self.l1l_criterion(self.fake, self.input)
+        self.loss_g['gen'] = self.loss_g['bce'] + self.loss_g['rec']
+        self.loss_g['gen'].backward(retain_graph=True)
+
         self.optimizer_g.step()
 
     ##
@@ -181,28 +187,30 @@ class Ganomaly3:
         self.update_netg()
 
         # If D loss is zero, then re-initialize netD
-        if self.err_d_real.item() < 1e-5 or self.err_d_fake.item() < 1e-5:
+        # if self.err_d_real.item() < 1e-5 or self.err_d_fake.item() < 1e-5:
+        if self.loss_d['real'].item() < 1e-5 or self.loss_d['fake'].item() < 1e-5:
             self.reinitialize_netd()
 
     ##
-    def get_errors(self):
+    def get_errors(self, exclude=['real', 'fake']):
         """ Get netD and netG errors.
 
         Returns:
             [OrderedDict]: Dictionary containing errors.
         """
 
-        errors = OrderedDict([
-            ('err_d', self.err_d.item()),
-            ('err_g', self.err_g.item()),
-            ('err_d_real', self.err_d_real.item()),
-            ('err_d_fake', self.err_d_fake.item()),
-            ('err_g_bce', self.err_g_bce.item()),
-            ('err_g_l1l', self.err_g_l1l.item()),
-            # ('err_g_enc', self.err_g_enc.item()),
-        ])
+        # errors = OrderedDict([
+        #     ('err_d', self.err_d.item()),
+        #     ('err_g', self.err_g.item()),
+        #     ('err_d_real', self.err_d_real.item()),
+        #     ('err_d_fake', self.err_d_fake.item()),
+        #     ('err_g_bce', self.err_g_bce.item()),
+        #     ('err_g_l1l', self.err_g_l1l.item()),
+        #     # ('err_g_enc', self.err_g_enc.item()),
+        # ])
 
-        return errors
+        # return errors
+        return {k: v.item() for k, v in {**self.loss_g, **self.loss_d}.items() if k not in exclude}
 
     ##
     def get_current_images(self):
@@ -289,10 +297,10 @@ class Ganomaly3:
             # Train for one epoch
             self.train_epoch()
             res = self.test()
-            if res['AUC'] > best_auc:
-                best_auc = res['AUC']
+            if res[self.opt.metric] > best_auc:
+                best_auc = res[self.opt.metric]
                 self.save_weights(self.epoch)
-            self.visualizer.print_current_performance(res, best_auc)
+            # self.visualizer.print_current_performance(res, best_auc)
         print(">> Training model %s.[Done]" % self.name())
 
     ##
@@ -381,9 +389,12 @@ class Ganomaly3:
 
             # Scale error vector between [0, 1]
             self.an_scores = (self.an_scores - torch.min(self.an_scores)) / (torch.max(self.an_scores) - torch.min(self.an_scores))
-            auc, eer = roc(self.gt_labels, self.an_scores)
-            performance = OrderedDict([('Avg Run Time (ms/batch)', self.times), ('EER', eer), ('AUC', auc)])
-
+            res = evaluate(self.gt_labels, self.an_scores, metric=self.opt.metric)
+            if len(res) == 2:
+                performance = OrderedDict([('Avg Run Time (ms/batch)', self.times), ('EER', res[1]), (f"{self.opt.metric}", res[0])])
+            else:
+                performance = OrderedDict([('Avg Run Time (ms/batch)', self.times), (f"{self.opt.metric}", res[0])])
+            
             if self.opt.display_id > 0 and self.opt.phase == 'test':
                 counter_ratio = float(epoch_iter) / len(self.dataloader['test'].dataset)
                 self.visualizer.plot_performance(self.epoch, counter_ratio, performance)

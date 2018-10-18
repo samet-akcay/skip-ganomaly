@@ -220,22 +220,22 @@ class UCSD(data.Dataset):
             img = self.loader(path)
             if self.transform is not None:
                 img = self.transform(img)
-            latentz = self.noise[index]
+            # latentz = self.noise[index]
             # return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': frame_gt}
-            return img, frame_gt
+            # return img, frame_gt
         else:
             path, frame_gt, path_pixel_gt = self.imgs[index]
             img = self.loader(path)
-            latentz = self.noise[index]
+            # latentz = self.noise[index]
             pixel_gt = self.loader(path_pixel_gt) #TODO need to convert this to tensor.
             if self.transform is not None:
                 img = self.transform(img)
                 pixel_gt = self.transform(pixel_gt)
             # return {'image': img, 'latentz': latentz, 'index': index, 'frame_gt': frame_gt, 'pixel_gt': pixel_gt}
-            return img, frame_gt
+        return img, frame_gt
 
-    def __setitem__(self, index, value):
-        self.noise[index] = value
+    # def __setitem__(self, index, value):
+    #     self.noise[index] = value
 
     def __len__(self):
         return len(self.imgs)

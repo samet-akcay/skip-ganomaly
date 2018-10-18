@@ -16,10 +16,14 @@ from scipy.optimize import brentq
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from matplotlib import rc
+import torch
 rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
 rc('text', usetex=True)
 
 def evaluate(labels, scores, metric='roc'):
+    if type(labels) == torch.Tensor: labels = labels.cpu().numpy()
+    if type(scores) == torch.Tensor: scores = scores.cpu().numpy()
+    
     if metric == 'roc':
         return roc(labels, scores)
     elif metric == 'auprc':
