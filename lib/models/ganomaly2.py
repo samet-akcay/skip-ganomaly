@@ -112,7 +112,7 @@ class Ganomaly2:
         # Loss Functions
         self.bce_criterion = nn.BCELoss()
         self.l1l_criterion = nn.L1Loss()
-        self.l2l_criterion = l2_loss
+        self.l2l_criterion = nn.MSELoss()
 
         ##
         # Initialize input tensors.
@@ -213,7 +213,7 @@ class Ganomaly2:
         self.err_g_l1l = self.l1l_criterion(self.fake, self.input)  # constrain x' to look like x
         # self.err_g_enc = self.l2l_criterion(self.latent_o, self.latent_i)
         # self.err_g = self.err_g_bce + self.err_g_l1l * self.opt.alpha + self.err_g_enc
-        self.err_g = self.err_g_bce + self.err_g_l1l * self.opt.alpha
+        self.err_g = self.err_g_bce * self.opt.w_bce + self.err_g_l1l * self.opt.w_rec
 
         self.err_g.backward(retain_graph=True)
         self.optimizer_g.step()
