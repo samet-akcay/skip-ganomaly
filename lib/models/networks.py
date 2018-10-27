@@ -3,6 +3,7 @@
 # pylint: disable=W0221,W0622,C0103,R0913
 
 ##
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -10,7 +11,37 @@ import functools
 from torch.optim import lr_scheduler
 from torch.nn import init
 
+##
+def define_G(opt):
+    netG = None
+    norm_layer = get_norm_layer(norm_type=opt.norm)
+    num_downs = int(np.log2(opt.isize))
 
+    if opt.netG == 'resnet_9blocks':
+        netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout, n_blocks=9)
+    elif opt.netG == 'resnet_6blocks':
+        netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout, n_blocks=6)
+    elif opt.netG == 'unet':
+        netG = UnetGenerator(opt.nc, opt.nc, num_downs, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout)
+    else:
+        raise NotImplementedError('Generator model name [%s] is not recognized' % opt.netG)
+    
+    return init_net(netG, opt.init_type, opt.gpu_ids)
+
+##
+def define_D(opt):
+    netD = None
+    norm_layer = get_norm_layer(norm_type=opt.norm)
+
+    if opt.netD == 'dcgan':
+        netD = NetDv2(opt)
+    elif opt.netD == 'basic':
+        netD = NLayerDiscriminator(opt.nc, opt.ndf, n_layers=3, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
+    elif opt.netD == 'pixel':
+        netD = PixelDiscriminator(opt.nc, opt.ndf, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
+    else:
+        raise NotImplementedError(f'Discriminator model name {netD} is not recognized')
+    return init_net(netD, opt.init_type, opt.gpu_ids)
 
 ##
 def weights_init(mod):
@@ -249,11 +280,10 @@ class NetG(nn.Module):
         return gen_imag, latent_i, latent_o
 
 
-###############################################################################
-# Helper Functions
-###############################################################################
-
-
+# = = = = = = = = = #
+# Helper Functions  #
+# = = = = = = = = = #
+##
 def get_norm_layer(norm_type='instance'):
     if norm_type == 'batch':
         norm_layer = functools.partial(nn.BatchNorm2d, affine=True)
@@ -265,7 +295,7 @@ def get_norm_layer(norm_type='instance'):
         raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
     return norm_layer
 
-
+##
 def get_scheduler(optimizer, opt):
     if opt.lr_policy == 'lambda':
         def lambda_rule(epoch):
@@ -280,7 +310,7 @@ def get_scheduler(optimizer, opt):
         return NotImplementedError('learning rate policy [%s] is not implemented', opt.lr_policy)
     return scheduler
 
-
+##
 def init_weights(net, init_type='normal', gain=0.02):
     def init_func(m):
         classname = m.__class__.__name__
@@ -304,7 +334,7 @@ def init_weights(net, init_type='normal', gain=0.02):
     print('initialize network with %s' % init_type)
     net.apply(init_func)
 
-
+##
 def init_net(net, init_type='normal', gpu_ids=[]):
     if len(gpu_ids) > 0:
         assert(torch.cuda.is_available())
@@ -312,45 +342,6 @@ def init_net(net, init_type='normal', gpu_ids=[]):
         net = torch.nn.DataParallel(net, gpu_ids)
     init_weights(net, init_type)
     return net
-
-
-def define_G(input_nc, output_nc, ngf, which_model_netG, norm='batch', use_dropout=False, init_type='normal', gpu_ids=[]):
-    netG = None
-    norm_layer = get_norm_layer(norm_type=norm)
-
-    if which_model_netG == 'resnet_9blocks':
-        netG = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
-    elif which_model_netG == 'resnet_6blocks':
-        netG = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6)
-    elif which_model_netG == 'unet_32':
-        netG = UnetGenerator(input_nc, output_nc, 5, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    elif which_model_netG == 'unet_64':
-        netG = UnetGenerator(input_nc, output_nc, 6, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    elif which_model_netG == 'unet_128':
-        netG = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    elif which_model_netG == 'unet_256':
-        netG = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    else:
-        raise NotImplementedError('Generator model name [%s] is not recognized' % which_model_netG)
-    return init_net(netG, init_type, gpu_ids)
-
-
-def define_D(input_nc, ndf, which_model_netD,
-             n_layers_D=3, norm='batch', use_sigmoid=False, init_type='normal', gpu_ids=[]):
-    netD = None
-    norm_layer = get_norm_layer(norm_type=norm)
-
-    if which_model_netD == 'basic':
-        netD = NLayerDiscriminator(input_nc, ndf, n_layers=3, norm_layer=norm_layer, use_sigmoid=use_sigmoid)
-    elif which_model_netD == 'n_layers':
-        netD = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer, use_sigmoid=use_sigmoid)
-    elif which_model_netD == 'pixel':
-        netD = PixelDiscriminator(input_nc, ndf, norm_layer=norm_layer, use_sigmoid=use_sigmoid)
-    else:
-        raise NotImplementedError('Discriminator model name [%s] is not recognized' %
-                                  which_model_netD)
-    return init_net(netD, init_type, gpu_ids)
-
 
 ##############################################################################
 # Classes

@@ -1,59 +1,134 @@
 """GANomaly
 """
-# pylint: disable=C0301,E0602,E1101,W0622,C0103,R0902,R0915
+# pylint: disable=C0301,E1101,W0622,C0103,R0902,R0915
 
 ##
+from collections import OrderedDict
 import os
 import time
 import numpy as np
 from tqdm import tqdm
-from collections import OrderedDict
 
-import torch
-import torch.nn as nn
+from torch.autograd import Variable
 import torch.optim as optim
+import torch.nn as nn
+import torch.utils.data
 import torchvision.utils as vutils
 
-from lib.loss import Loss
-from lib.evaluate import roc
+from lib.models.networks import NetD, NetDv2, weights_init, define_G, get_scheduler
 from lib.visualizer import Visualizer
-from lib.models.networks import define_D, define_G, get_scheduler
+from lib.loss import l2_loss
+from lib.evaluate import roc
 
 ##
-class Ganomaly2:
+class NetG(nn.Module):
+    """
+    GENERATOR NETWORK
+    """
+
+    def __init__(self, opt):
+        super(NetG, self).__init__()
+        self.model = define_G(input_nc=opt.nc, output_nc=opt.nc, ngf=64,
+                              which_model_netG='unet_32',
+                              norm='batch', use_dropout=False, init_type='normal',
+                              gpu_ids=opt.gpu_ids)
+
+    def forward(self, x):
+        latent_i = self.encoder1(x)
+        gen_imag = self.decoder(latent_i)
+        latent_o = self.encoder2(gen_imag)
+        return gen_imag, latent_i, latent_o
+
+##
+
+
+class Model:
     """GANomaly Class
     """
 
     def __init__(self, opt, dataloader=None):
-        super(Ganomaly2, self).__init__()
+        super(Model, self).__init__()
         ##
         # Initalize variables.
-        self.name = 'ganomaly2'
+        self.name = 'model'
         self.opt = opt
         self.visualizer = Visualizer(opt)
         self.dataloader = dataloader
-        self.device = torch.device("cuda:0" if self.opt.gpu_ids != -1 else "cpu")
+        self.trn_dir = os.path.join(self.opt.outf, self.opt.name, 'train')
+        self.tst_dir = os.path.join(self.opt.outf, self.opt.name, 'test')
+        self.device = torch.device(
+            "cuda:0" if self.opt.gpu_ids != -1 else "cpu")
 
-        # Input, output and loss variables.
-        self.input = Input(opt)
-        self.output = Output(opt)
-        self.loss = Loss()
+        # -- Discriminator attributes.
+        self.out_d_real = None
+        self.feat_real = None
+        self.err_d_real = None
+        self.fake = None
+        # self.latent_i = None
+        # self.latent_o = None
+        self.out_d_fake = None
+        self.feat_fake = None
+        self.err_d_fake = None
+        self.err_d = None
 
-        # -- Misc variables.
+        # -- Generator attributes.
+        self.out_g = None
+        self.err_g_bce = None
+        self.err_g_l1l = None
+        self.err_g_enc = None
+        self.err_g = None
+
+        # -- Misc attributes
         self.epoch = 0
         self.times = []
-        self.steps = 0
-
-        ## Create and Load Models.
-        self.netg = define_G(opt)
-        # self.netd = NetDv2(self.opt).to(self.device)
-        self.netd = define_D(opt)
-        # TODO: Create define_D function
+        self.total_steps = 0
 
         ##
-        if self.opt.resume != '': self.load_weights(path=self.opt.resume)
+        # Create and initialize networks.
+        # self.netg = NetG(self.opt).to(self.device)
+        self.netg = define_G(opt, input_nc=self.opt.nc, output_nc=self.opt.nc, ngf=self.opt.ngf,
+                             which_model_netG='unet',
+                             norm='batch', use_dropout=False, init_type='normal',
+                             gpu_ids=opt.gpu_ids)
+        self.netd = NetDv2(self.opt).to(self.device)
+        # self.netd2 = NetDv2(self.opt).to(self.device)
+        self.netg.apply(weights_init)
+        self.netd.apply(weights_init)
+
+        ##
+        if self.opt.resume != '':
+            print("\nLoading pre-trained networks.")
+            self.opt.iter = torch.load(os.path.join(
+                self.opt.resume, 'netG.pth'))['epoch']
+            self.netg.load_state_dict(torch.load(os.path.join(
+                self.opt.resume, 'netG.pth'))['state_dict'])
+            self.netd.load_state_dict(torch.load(os.path.join(
+                self.opt.resume, 'netD.pth'))['state_dict'])
+            print("\tDone.\n")
+
         print(self.netg)
         print(self.netd)
+
+        ##
+        # Loss Functions
+        self.bce_criterion = nn.BCELoss()
+        self.l1l_criterion = nn.L1Loss()
+        self.l2l_criterion = l2_loss
+
+        ##
+        # Initialize input tensors.
+        self.input = torch.empty(size=(self.opt.batchsize, 3, self.opt.isize,
+                                       self.opt.isize), dtype=torch.float32, device=self.device)
+        self.noise = torch.empty(size=(self.opt.batchsize, 3, self.opt.isize,
+                                       self.opt.isize), dtype=torch.float32, device=self.device)
+        self.label = torch.empty(
+            size=(self.opt.batchsize,), dtype=torch.float32, device=self.device)
+        self.gt = torch.empty(size=(opt.batchsize,),
+                              dtype=torch.long, device=self.device)
+        self.fixed_input = torch.empty(size=(
+            self.opt.batchsize, 3, self.opt.isize, self.opt.isize), dtype=torch.float32, device=self.device)
+        self.real_label = 1
+        self.fake_label = 0
 
         ##
         # Setup optimizer
@@ -74,16 +149,16 @@ class Ganomaly2:
         Args:
             input (FloatTensor): Input data for batch i.
         """
-        self.input.img.data.resize_(input[0].size()).copy_(input[0])
-        self.input.gts.data.resize_(input[1].size()).copy_(input[1])
+        self.input.data.resize_(input[0].size()).copy_(input[0])
+        self.gt.data.resize_(input[1].size()).copy_(input[1])
 
         # Add Gaussian Noise if requested.
-        if self.opt.add_noise:
-            self.input.noi = self.input.img.data.new(input[0].size()).normal_(self.opt.mean,self.opt.std)
+        if self.opt.add_gaussian_noise:
+            self.noise = self.input.data.new(input[0].size()).normal_(self.opt.mean,self.opt.std)
 
-        # Assign the first batch as fixed input.
-        if self.steps == self.opt.batchsize:
-            self.input.fix.data.resize_(input[0].size()).copy_(input[0])
+        # Copy the first batch as the fixed input.
+        if self.total_steps == self.opt.batchsize:
+            self.fixed_input.data.resize_(input[0].size()).copy_(input[0])
 
     ##
     def update_netd(self):
@@ -94,92 +169,27 @@ class Ganomaly2:
         self.netd.zero_grad()
         # --
         # Train with real
-        self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.real_lbl)
-        self.output.real_score, self.output.real_feats = self.netd(self.input.img + self.input.noi)
-        self.loss.d.real = self.loss.bce(self.output.real_score, self.input.lbl)
-        self.loss.d.real.backward(retain_graph=True)
+        self.label.data.resize_(self.opt.batchsize).fill_(self.real_label)
+        if self.opt.add_gaussian_noise: self.out_d_real, self.feat_real = self.netd(self.input + self.noise)
+        else: self.out_d_real, self.feat_real = self.netd(self.input)
+        self.err_d_real = self.bce_criterion(self.out_d_real, self.label)
+        self.err_d_real.backward(retain_graph=True)
         # --
         # Train with fake
-        self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.fake_lbl)
-        self.output.img = self.netg(self.input.img + self.input.noi)
+        self.label.data.resize_(self.opt.batchsize).fill_(self.fake_label)
+        self.fake = self.netg(self.input + self.noise)
 
-        self.output.fake_score, self.output.fake_feats = self.netd(self.output.img.detach())
-        self.loss.d.fake = self.loss.bce(self.output.fake_score, self.input.lbl)
+        self.out_d_fake, self.feat_fake = self.netd(self.fake.detach())
+        self.err_d_fake = self.bce_criterion(self.out_d_fake, self.label)
 
         # Feature Loss btw real and fake images.
-        self.loss.g.enc = self.loss.l2(self.output.fake_feats, self.output.real_feats)
-        self.loss.g.enc.backward(retain_graph=True)
+        self.err_g_enc = self.l2l_criterion(self.feat_fake, self.feat_real)
+        self.err_g_enc.backward(retain_graph=True)
 
         # --
-        self.loss.d.fake.backward()
-        self.loss.d.total = self.loss.d.real + self.loss.d.fake + self.loss.g.enc
+        self.err_d_fake.backward()
+        self.err_d = self.err_d_real + self.err_d_fake + self.err_g_enc
         self.optimizer_d.step()
-
-    ##
-    def update_netg(self):
-        """
-        # ============================================================ #
-        # (2) Update G network: log(D(G(z)))  + ||G(z) - x||           #
-        # ============================================================ #
-        """
-        self.netg.zero_grad()
-        self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.real_lbl)
-        self.output.fake_score, self.output.fake_feats = self.netd(self.output.img)
-
-        self.loss.g.adv = self.opt.w_adv * self.loss.bce(self.output.fake_score, self.input.lbl)
-        self.loss.g.rec = self.opt.w_rec * self.loss.l1(self.output.img, self.input.img)
-        self.loss.g.total = self.loss.g.adv + self.loss.g.rec
-
-        self.loss.g.total.backward(retain_graph=True)
-        self.optimizer_g.step()
-
-    # ##
-    # def update_netd(self):
-    #     """
-    #     Update D network: Ladv = |f(real) - f(fake)|_2
-    #     """
-    #     ##
-    #     # Feature Matching.
-    #     self.netd.zero_grad()
-    #     # --
-    #     # Train with real
-    #     self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.real_lbl)
-    #     self.output.real_score, self.output.real_feats = self.netd(self.input.img + self.input.noi)
-
-    #     # --
-    #     # Train with fake
-    #     self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.fake_lbl)
-    #     self.output.img = self.netg(self.input.img + self.input.noi)
-    #     self.output.fake_score, self.output.fake_feats = self.netd(self.output.img.detach())
-
-    #     # --
-    #     # Compute Loss and Backward-Pass.
-    #     self.loss.d.total = self.loss.l2(self.output.real_feats, self.output.fake_feats)
-    #     self.loss.d.real = self.loss.d.total
-    #     self.loss.d.fake = self.loss.d.total
-    #     self.loss.d.total.backward(retain_graph=True)
-    #     self.optimizer_d.step()
-
-    # ##
-    # def update_netg(self):
-    #     """
-    #     # ============================================================ #
-    #     # (2) Update G network: log(D(G(z)))  + ||G(z) - x||           #
-    #     # ============================================================ #
-
-    #     """
-    #     self.netg.zero_grad()
-    #     self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.real_lbl)
-    #     self.output.fake_score, self.output.fake_feats = self.netd(self.output.img)
-
-    #     self.loss.g.adv = self.opt.w_adv * self.loss.bce(self.output.fake_score, self.input.lbl)
-    #     self.loss.g.rec = self.opt.w_rec * self.loss.l1 (self.output.img, self.input.img)
-    #     self.loss.g.enc = self.opt.w_enc * self.loss.l2 (self.output.real_feats, self.output.fake_feats)
-    #     self.loss.g.total = self.loss.g.adv + self.loss.g.rec + self.loss.g.enc
-
-    #     self.loss.g.total.backward(retain_graph=True)
-    #     self.optimizer_g.step()
-
 
     ##
     def reinitialize_netd(self):
@@ -189,13 +199,34 @@ class Ganomaly2:
         print('Reloading d net')
 
     ##
+    def update_netg(self):
+        """
+        # ============================================================ #
+        # (2) Update G network: log(D(G(z)))  + ||G(z) - x||           #
+        # ============================================================ #
+
+        """
+        self.netg.zero_grad()
+        self.label.data.resize_(self.opt.batchsize).fill_(self.real_label)
+        self.out_g, _ = self.netd(self.fake)
+
+        self.err_g_bce = self.bce_criterion(self.out_g, self.label)
+        self.err_g_l1l = self.l1l_criterion(self.fake, self.input)  # constrain x' to look like x
+        # self.err_g_enc = self.l2l_criterion(self.latent_o, self.latent_i)
+        # self.err_g = self.err_g_bce + self.err_g_l1l * self.opt.alpha + self.err_g_enc
+        self.err_g = self.err_g_bce + self.err_g_l1l * self.opt.w_rec
+
+        self.err_g.backward(retain_graph=True)
+        self.optimizer_g.step()
+
     def update_learning_rate(self):
         """ Update learning rate based on the rule provided in options.
         """
+
         for scheduler in self.schedulers:
             scheduler.step()
         lr = self.optimizers[0].param_groups[0]['lr']
-        # print('   LR = %.7f' % lr)
+        print('   LR = %.7f' % lr)
 
     ##
     def optimize(self):
@@ -206,7 +237,7 @@ class Ganomaly2:
         self.update_netg()
 
         # If D loss is zero, then re-initialize netD
-        if self.loss.d.real.item() < 1e-5 or self.loss.d.fake.item() < 1e-5:
+        if self.err_d_real.item() < 1e-5 or self.err_d_fake.item() < 1e-5:
             self.reinitialize_netd()
 
     ##
@@ -217,13 +248,13 @@ class Ganomaly2:
             [OrderedDict]: Dictionary containing errors.
         """
 
-        errors = OrderedDict([('loss.d.total', self.loss.d.total.item()),
-                              ('loss.g.total', self.loss.g.total.item()),
-                              ('loss.d.real', self.loss.d.real.item()),
-                              ('loss.d.fake', self.loss.d.fake.item()),
-                              ('loss.g.adv', self.loss.g.adv.item()),
-                              ('loss.g.rec', self.loss.g.rec.item()),
-                              ('loss.g.enc', self.loss.g.enc.item())])
+        errors = OrderedDict([('err_d', self.err_d.item()),
+                              ('err_g', self.err_g.item()),
+                              ('err_d_real', self.err_d_real.item()),
+                              ('err_d_fake', self.err_d_fake.item()),
+                              ('err_g_bce', self.err_g_bce.item()),
+                              ('err_g_l1l', self.err_g_l1l.item()),
+                              ('err_g_enc', self.err_g_enc.item())])
 
         return errors
 
@@ -235,9 +266,9 @@ class Ganomaly2:
             [reals, fakes, fixed]
         """
 
-        reals = self.input.img.data
-        fakes = self.output.img.data
-        fixed = self.netg(self.input.fix).data
+        reals = self.input.data
+        fakes = self.fake.data
+        fixed = self.netg(self.fixed_input).data
 
         return reals, fakes, fixed
 
@@ -287,15 +318,11 @@ class Ganomaly2:
         if path is None:
             path_g = f"./output/{self.name}/{self.opt.dataset}/train/weights/{fname_g}"
             path_d = f"./output/{self.name}/{self.opt.dataset}/train/weights/{fname_d}"
-        else:
-            path_g = f"{path}/netG_best.pth"
-            path_d = f"{path}/netD_best.pth"
 
         # Load the weights of netg and netd.
         weights_g = torch.load(path_g)['state_dict']
         weights_d = torch.load(path_d)['state_dict']
         try:
-            self.opt.iter = torch.load(path_g)['epoch']
             self.netg.load_state_dict(weights_g)
             self.netd.load_state_dict(weights_d)
         except IOError:
@@ -310,13 +337,13 @@ class Ganomaly2:
         self.netg.train()
         epoch_iter = 0
         for data in tqdm(self.dataloader['train'], leave=False, total=len(self.dataloader['train'])):
-            self.steps += self.opt.batchsize
+            self.total_steps += self.opt.batchsize
             epoch_iter += self.opt.batchsize
 
             self.set_input(data)
             self.optimize()
 
-            if self.steps % self.opt.print_freq == 0:
+            if self.total_steps % self.opt.print_freq == 0:
                 errors = self.get_errors()
                 if self.opt.display:
                     counter_ratio = float(epoch_iter) / \
@@ -324,7 +351,7 @@ class Ganomaly2:
                     self.visualizer.plot_current_errors(
                         self.epoch, counter_ratio, errors)
 
-            if self.steps % self.opt.save_image_freq == 0:
+            if self.total_steps % self.opt.save_image_freq == 0:
                 reals, fakes, fixed = self.get_current_images()
                 self.visualizer.save_current_images(
                     self.epoch, reals, fakes, fixed)
@@ -341,7 +368,7 @@ class Ganomaly2:
 
         ##
         # TRAIN
-        self.steps = 0
+        self.total_steps = 0
         best_auc = 0
 
         # Train for niter epochs.
@@ -370,7 +397,9 @@ class Ganomaly2:
         """
         with torch.no_grad():
             # Load the weights of netg and netd.
-            if self.opt.load_weights: self.load_weights(is_best=True)
+            if self.opt.load_weights:
+                self.load_weights(is_best=True)
+
             self.opt.phase = 'test'
 
             # Create big error tensor for the test set.
@@ -387,38 +416,40 @@ class Ganomaly2:
             #                              dtype=torch.float32,
             #                              device=self.device)
 
-            print(f"   Testing {self.name}")
+            print("   Testing %s" % self.name)
             self.times = []
-            self.steps = 0
+            self.total_steps = 0
             epoch_iter = 0
             for i, data in enumerate(self.dataloader['test'], 0):
-                self.steps += self.opt.batchsize
+                self.total_steps += self.opt.batchsize
                 epoch_iter += self.opt.batchsize
                 time_i = time.time()
                 
                 # Forward - Pass
                 self.set_input(data)
-                self.output.img = self.netg(self.input.img)
+                self.fake = self.netg(self.input)
 
-                _, self.output.real_feats = self.netd(self.input.img)
-                _, self.output.fake_feats = self.netd(self.output.img)
+                _, self.feat_real = self.netd(self.input)
+                _, self.feat_fake = self.netd(self.fake)
+
 
                 # Calculate the anomaly score.
-                si = self.input.img.size()
-                sz = self.output.real_feats.size()
-                rec = (self.input.img - self.output.img).view(si[0], si[1] * si[2] * si[3])
-                lat = (self.output.real_feats - self.output.fake_feats).view(sz[0], sz[1] * sz[2] * sz[3])
+                si = self.input.size()
+                sz = self.feat_real.size()
+                rec = (self.input - self.fake).view(si[0], si[1] * si[2] * si[3])
+                lat = (self.feat_real - self.feat_fake).view(sz[0], sz[1] * sz[2] * sz[3])
                 rec = torch.mean(torch.pow(rec, 2), dim=1)
                 lat = torch.mean(torch.pow(lat, 2), dim=1)
                 error = 0.9*rec + 0.1*lat
 
                 time_o = time.time()
 
-                # latent_i = self.output.real_feats.view(sizes[0], sizes[1] * sizes[2] * sizes[3])
-                # latent_o = self.output.fake_feats.view(sizes[0], sizes[1] * sizes[2] * sizes[3])
+                # latent_i = self.feat_real.view(sizes[0], sizes[1] * sizes[2] * sizes[3])
+                # latent_o = self.feat_fake.view(sizes[0], sizes[1] * sizes[2] * sizes[3])
 
                 self.an_scores[i*self.opt.batchsize: i*self.opt.batchsize + error.size(0)] = error.reshape(error.size(0))
-                self.gt_labels[i*self.opt.batchsize: i*self.opt.batchsize + error.size(0)] = self.input.gts.reshape(error.size(0))
+                self.gt_labels[i*self.opt.batchsize: i*self.opt.batchsize +
+                               error.size(0)] = self.gt.reshape(error.size(0))
                 # self.latent_i[i*self.opt.batchsize: i*self.opt.batchsize +
                 #               error.size(0), :] = latent_i.reshape(error.size(0), self.opt.nz)
                 # self.latent_o[i*self.opt.batchsize: i*self.opt.batchsize +
@@ -428,11 +459,15 @@ class Ganomaly2:
 
                 # Save test images.
                 if self.opt.save_test_images:
-                    dst = os.path.join(self.opt.outf, self.opt.name, 'test', 'images')
-                    if not os.path.isdir(dst): os.makedirs(dst)
+                    dst = os.path.join(
+                        self.opt.outf, self.opt.name, 'test', 'images')
+                    if not os.path.isdir(dst):
+                        os.makedirs(dst)
                     real, fake, _ = self.get_current_images()
-                    vutils.save_image(real, '%s/real_%03d.eps' % (dst, i+1), normalize=True)
-                    vutils.save_image(fake, '%s/fake_%03d.eps' % (dst, i+1), normalize=True)
+                    vutils.save_image(real, '%s/real_%03d.eps' %
+                                      (dst, i+1), normalize=True)
+                    vutils.save_image(fake, '%s/fake_%03d.eps' %
+                                      (dst, i+1), normalize=True)
 
             # Measure inference time.
             self.times = np.array(self.times)
@@ -442,37 +477,42 @@ class Ganomaly2:
             self.an_scores = (self.an_scores - torch.min(self.an_scores)) / \
                 (torch.max(self.an_scores) - torch.min(self.an_scores))
             auc, eer = roc(self.gt_labels, self.an_scores)
-            performance = {'Avg Run Time (ms/batch)': self.times, 'EER': eer, 'AUC': auc}
+            performance = OrderedDict(
+                [('Avg Run Time (ms/batch)', self.times), ('EER', eer), ('AUC', auc)])
 
             if self.opt.display_id > 0 and self.opt.phase == 'test':
-                counter_ratio = float(epoch_iter) / len(self.dataloader['test'].dataset)
-                self.visualizer.plot_performance(self.epoch, counter_ratio, performance)
+                counter_ratio = float(epoch_iter) / \
+                    len(self.dataloader['test'].dataset)
+                self.visualizer.plot_performance(
+                    self.epoch, counter_ratio, performance)
             return performance
 
     def demo(self):
         with torch.no_grad():
             # Load the weights of netg and netd.
-            if self.opt.load_weights: self.load_weights(is_best=True)
+            if self.opt.load_weights:
+                self.load_weights(is_best=True)
+
             self.opt.phase = 'test'
 
-            self.steps = 0
+            self.total_steps = 0
             epoch_iter = 0
             key = 'a'
             for i, data in enumerate(self.dataloader['test'], 0):
-                self.steps += self.opt.batchsize
+                self.total_steps += self.opt.batchsize
                 epoch_iter += self.opt.batchsize
                 time_i = time.time()
                 self.set_input(data)
-                self.output.img = self.netg(self.input.img)
+                self.fake = self.netg(self.input)
 
-                _, self.output.real_feats = self.netd(self.input.img)
-                _, self.output.fake_feats = self.netd(self.output.img)
+                _, self.feat_real = self.netd(self.input)
+                _, self.feat_fake = self.netd(self.fake)
 
                 while key != 'n':
                     # Show the images on visdom.
-                    reals = self.visualizer.normalize(self.input.img.cpu().numpy())
-                    fakes = self.visualizer.normalize(self.output.img.cpu().numpy())
-                    diffs = self.visualizer.normalize((self.input.img - self.output.img).cpu().numpy())
+                    reals = self.visualizer.normalize(self.input.cpu().numpy())
+                    fakes = self.visualizer.normalize(self.fake.cpu().numpy())
+                    diffs = self.visualizer.normalize((self.input - self.fake).cpu().numpy())
                     self.visualizer.vis.images(reals, win=1, opts={'title': 'Reals'})
                     self.visualizer.vis.images(fakes, win=2, opts={'title': 'Fakes'})
                     self.visualizer.vis.images(diffs, win=3, opts={'title': 'Diffs'})
@@ -482,33 +522,4 @@ class Ganomaly2:
                     print('Quitting...')
                     break
 
-##
-class Input:
-    def __init__(self, opt):
-        img_size = (opt.batchsize, opt.nc, opt.isize, opt.isize)
-        img_type = torch.float32
-        gts_size = (opt.batchsize,)
-        gts_type = torch.long
-        device   = torch.device("cuda:0" if opt.gpu_ids != -1 else "cpu")
 
-        self.img = torch.empty(size=img_size, dtype=img_type, device=device)
-        self.gts = torch.empty(size=gts_size, dtype=gts_type, device=device)
-        self.noi = torch.empty(size=img_size, dtype=img_type, device=device)
-        self.fix = torch.empty(size=img_size, dtype=img_type, device=device)
-
-        self.lbl = torch.empty(size=gts_size, dtype=img_type, device=device)
-        self.fake_lbl = 0
-        self.real_lbl = 1
-
-##
-class Output:
-    def __init__(self, opt):
-        img_size = (opt.batchsize, opt.nc, opt.isize, opt.isize)
-        img_type = torch.float32      
-        device   = torch.device("cuda:0" if opt.gpu_ids != -1 else "cpu")
-
-        self.img = torch.empty(size=img_size, dtype=img_type, device=device)
-        self.real_feats = None
-        self.fake_feats = None
-        self.real_score = torch.empty(size=(opt.batchsize,), dtype=torch.float32, device=device)
-        self.fake_score = torch.empty(size=(opt.batchsize,), dtype=torch.float32, device=device)
