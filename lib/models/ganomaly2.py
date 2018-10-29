@@ -110,8 +110,10 @@ class Ganomaly2:
         self.loss.g.enc = self.loss.l2(self.output.fake_feats, self.output.real_feats)
 
         # --
-        # self.loss.d.fake.backward()
-        self.loss.d.total = self.loss.d.real + self.loss.d.fake + self.loss.g.enc
+        # Compute the total loss based on the training type (feature maching | standard bce.)
+        if self.opt.netD_training == 'fm': self.loss.d.total = self.loss.g.enc
+        elif self.opt.netD_training == 'bce': self.loss.d.total = self.loss.d.real + self.loss.d.fake + self.loss.g.enc
+        else: raise Exception('Supported netD trainings are: fm | bce')
         self.loss.d.total.backward(retain_graph=True)
         self.optimizer_d.step()
 
@@ -126,12 +128,11 @@ class Ganomaly2:
         self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.real_lbl)
         self.output.fake_score, self.output.fake_feats = self.netd(self.output.img)
 
-        self.loss.g.adv = self.opt.w_adv * self.loss.bce(self.output.fake_score, self.input.lbl)
-        self.loss.g.rec = self.opt.w_rec * self.loss.l1(self.output.img, self.input.img)
-        self.loss.g.enc = self.opt.w_enc * self.loss.l2(self.output.fake_feats, self.output.real_feats)
+        self.loss.g.adv   = self.opt.w_adv  * self.loss.bce(self.output.fake_score, self.input.lbl)
+        self.loss.g.rec   = self.opt.w_rec  * self.loss.l1(self.output.img, self.input.img)
         self.loss.g.total = self.loss.g.adv + self.loss.g.rec + self.loss.g.enc
 
-        self.loss.g.total.backward(retain_graph=False)
+        self.loss.g.total.backward()
         self.optimizer_g.step()
 
     # ##
@@ -155,30 +156,30 @@ class Ganomaly2:
 
     #     # --
     #     # Compute Loss and Backward-Pass.
-    #     self.loss.d.total = self.loss.l2(self.output.real_feats, self.output.fake_feats)
+    #     self.loss.g.enc   = self.opt.w_enc  * self.loss.l2(self.output.fake_feats, self.output.real_feats)
+    #     # self.loss.d.total = self.loss.l2(self.output.real_feats, self.output.fake_feats)
+    #     self.loss.d.total = self.loss.g.enc
     #     self.loss.d.real = self.loss.d.total
     #     self.loss.d.fake = self.loss.d.total
     #     self.loss.d.total.backward(retain_graph=True)
     #     self.optimizer_d.step()
-
+    # 
     # ##
     # def update_netg(self):
     #     """
     #     # ============================================================ #
     #     # (2) Update G network: log(D(G(z)))  + ||G(z) - x||           #
     #     # ============================================================ #
-
     #     """
     #     self.netg.zero_grad()
     #     self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.real_lbl)
     #     self.output.fake_score, self.output.fake_feats = self.netd(self.output.img)
 
-    #     self.loss.g.adv = self.opt.w_adv * self.loss.bce(self.output.fake_score, self.input.lbl)
-    #     self.loss.g.rec = self.opt.w_rec * self.loss.l1 (self.output.img, self.input.img)
-    #     self.loss.g.enc = self.opt.w_enc * self.loss.l2 (self.output.real_feats, self.output.fake_feats)
+    #     self.loss.g.adv   = self.opt.w_adv  * self.loss.bce(self.output.fake_score, self.input.lbl)
+    #     self.loss.g.rec   = self.opt.w_rec  * self.loss.l1(self.output.img, self.input.img)
     #     self.loss.g.total = self.loss.g.adv + self.loss.g.rec + self.loss.g.enc
 
-    #     self.loss.g.total.backward(retain_graph=True)
+    #     self.loss.g.total.backward(retain_graph=False)
     #     self.optimizer_g.step()
 
 

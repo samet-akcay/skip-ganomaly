@@ -23,6 +23,8 @@ def define_G(opt):
         netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout, n_blocks=6)
     elif opt.netG == 'unet':
         netG = UnetGenerator(opt.nc, opt.nc, num_downs, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout)
+    elif opt.netG == 'dcgan':
+        netG = DCGAN(opt)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % opt.netG)
     
@@ -260,6 +262,19 @@ class NetD(nn.Module):
         classifier = classifier.view(-1, 1).squeeze(1)
 
         return classifier, features
+
+##
+class DCGAN(nn.Module):
+    """
+    GENERATOR NETWORK
+    """
+    def __init__(self, opt):
+        super(DCGAN, self).__init__()
+        self.encoder = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.decoder = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+
+    def forward(self, x):
+        return self.decoder(self.encoder(x))
 
 ##
 class NetG(nn.Module):

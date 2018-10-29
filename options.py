@@ -48,6 +48,7 @@ class Options():
         self.parser.add_argument('--model', type=str, default='ganomaly2', help='chooses which model to use. ganomaly')
         self.parser.add_argument('--netG', default='unet', help='Type of NetG')
         self.parser.add_argument('--netD', default='dcgan', help='Type of NetD')
+        self.parser.add_argument('--netD_training', default='fm', help='fm|bce NetD training type')
         self.parser.add_argument('--display_server', type=str, default="http://localhost", help='visdom server of the web display')
         self.parser.add_argument('--display_port', type=int, default=8097, help='visdom port of the web display')
         self.parser.add_argument('--display_id', type=int, default=0, help='window id of the web display')
