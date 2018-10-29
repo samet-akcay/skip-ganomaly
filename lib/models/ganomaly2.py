@@ -97,7 +97,7 @@ class Ganomaly2:
         self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.real_lbl)
         self.output.real_score, self.output.real_feats = self.netd(self.input.img + self.input.noi)
         self.loss.d.real = self.loss.bce(self.output.real_score, self.input.lbl)
-        self.loss.d.real.backward(retain_graph=True)
+
         # --
         # Train with fake
         self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.fake_lbl)
@@ -108,11 +108,11 @@ class Ganomaly2:
 
         # Feature Loss btw real and fake images.
         self.loss.g.enc = self.loss.l2(self.output.fake_feats, self.output.real_feats)
-        self.loss.g.enc.backward(retain_graph=True)
 
         # --
-        self.loss.d.fake.backward()
+        # self.loss.d.fake.backward()
         self.loss.d.total = self.loss.d.real + self.loss.d.fake + self.loss.g.enc
+        self.loss.d.total.backward(retain_graph=True)
         self.optimizer_d.step()
 
     ##
@@ -128,9 +128,10 @@ class Ganomaly2:
 
         self.loss.g.adv = self.opt.w_adv * self.loss.bce(self.output.fake_score, self.input.lbl)
         self.loss.g.rec = self.opt.w_rec * self.loss.l1(self.output.img, self.input.img)
-        self.loss.g.total = self.loss.g.adv + self.loss.g.rec
+        self.loss.g.enc = self.opt.w_enc * self.loss.l2(self.output.fake_feats, self.output.real_feats)
+        self.loss.g.total = self.loss.g.adv + self.loss.g.rec + self.loss.g.enc
 
-        self.loss.g.total.backward(retain_graph=True)
+        self.loss.g.total.backward(retain_graph=False)
         self.optimizer_g.step()
 
     # ##
@@ -333,8 +334,8 @@ class Ganomaly2:
 
         print(f">> Training {self.name}. Epoch {self.epoch + 1} / {self.opt.niter}")
         # self.visualizer.print_current_errors(self.epoch, errors)
+    
     ##
-
     def train(self):
         """ Train the model
         """
@@ -400,8 +401,8 @@ class Ganomaly2:
                 self.set_input(data)
                 self.output.img = self.netg(self.input.img)
 
-                _, self.output.real_feats = self.netd(self.input.img)
-                _, self.output.fake_feats = self.netd(self.output.img)
+                self.output.real_score, self.output.real_feats = self.netd(self.input.img)
+                self.output.fake_score, self.output.fake_feats = self.netd(self.output.img)
 
                 # Calculate the anomaly score.
                 si = self.input.img.size()
@@ -411,18 +412,12 @@ class Ganomaly2:
                 rec = torch.mean(torch.pow(rec, 2), dim=1)
                 lat = torch.mean(torch.pow(lat, 2), dim=1)
                 error = 0.9*rec + 0.1*lat
-
+                # TODO: Anomaly score has been changed.
+                # error = self.output.fake_score
                 time_o = time.time()
-
-                # latent_i = self.output.real_feats.view(sizes[0], sizes[1] * sizes[2] * sizes[3])
-                # latent_o = self.output.fake_feats.view(sizes[0], sizes[1] * sizes[2] * sizes[3])
 
                 self.an_scores[i*self.opt.batchsize: i*self.opt.batchsize + error.size(0)] = error.reshape(error.size(0))
                 self.gt_labels[i*self.opt.batchsize: i*self.opt.batchsize + error.size(0)] = self.input.gts.reshape(error.size(0))
-                # self.latent_i[i*self.opt.batchsize: i*self.opt.batchsize +
-                #               error.size(0), :] = latent_i.reshape(error.size(0), self.opt.nz)
-                # self.latent_o[i*self.opt.batchsize: i*self.opt.batchsize +
-                #               error.size(0), :] = latent_o.reshape(error.size(0), self.opt.nz)
 
                 self.times.append(time_o - time_i)
 
