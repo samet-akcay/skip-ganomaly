@@ -56,6 +56,7 @@ class Options():
         self.parser.add_argument('--outf', default='./output', help='folder to output images and model checkpoints')
         self.parser.add_argument('--manualseed', type=int, help='manual seed')
         self.parser.add_argument('--anomaly_class', default='car', help='Anomaly class idx for mnist and cifar datasets')
+        self.parser.add_argument('--proportion', type=float, default=0.1, help='Proportion of anomalies in test set.')
 
         ##
         # Train

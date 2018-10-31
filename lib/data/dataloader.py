@@ -6,7 +6,6 @@ LOAD DATA from file.
 import os
 import torch
 import numpy as np
-from torchvision.datasets import MNIST
 from torchvision.datasets import CIFAR10
 from torchvision.datasets import ImageFolder
 import torchvision.transforms as transforms
@@ -37,7 +36,7 @@ def load_data(opt):
 
         transform = transforms.Compose(
             [
-                transforms.Scale(opt.isize),
+                transforms.Resize(opt.isize),
                 transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             ]
@@ -77,12 +76,13 @@ def load_data(opt):
 
         transform = transforms.Compose(
             [
-                transforms.Scale(opt.isize),
+                transforms.Resize(opt.isize),
                 transforms.ToTensor(),
                 transforms.Normalize((0.1307,), (0.3081,))
             ]
         )
 
+        from torchvision.datasets import MNIST
         dataset = {}
         dataset['train'] = MNIST(root='./data', train=True, download=True, transform=transform)
         dataset['test'] = MNIST(root='./data', train=False, download=True, transform=transform)
@@ -96,6 +96,11 @@ def load_data(opt):
             abn_cls_idx=opt.anomaly_class
         )
 
+        # from .datasets import MNIST
+        # dataset = {}
+        # dataset['train'] = MNIST(opt, root='./data/mnist', split='train', transform=transform)
+        # dataset['test']  = MNIST(opt, root='./data/mnist', split='test',  transform=transform)
+
         dataloader = {x: torch.utils.data.DataLoader(dataset=dataset[x],
                                                      batch_size=opt.batchsize,
                                                      shuffle=shuffle[x],
@@ -108,7 +113,7 @@ def load_data(opt):
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
         shuffle = {'train': True, 'test': True}
-        transform = transforms.Compose([transforms.Scale(opt.isize),
+        transform = transforms.Compose([transforms.Resize(opt.isize),
                                         transforms.CenterCrop(opt.isize),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
@@ -126,7 +131,7 @@ def load_data(opt):
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
         shuffle = {'train': True, 'test': True}
-        transform = transforms.Compose([transforms.Scale(opt.isize),
+        transform = transforms.Compose([transforms.Resize(opt.isize),
                                         transforms.CenterCrop(opt.isize),
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
