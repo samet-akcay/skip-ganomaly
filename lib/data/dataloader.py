@@ -9,7 +9,6 @@ import os
 import sys
 import torch
 import numpy as np
-from torchvision.datasets import MNIST
 from torchvision.datasets import CIFAR10
 from torchvision.datasets import ImageFolder
 # from torchvision.datasets import DatasetFolder
@@ -130,6 +129,7 @@ def load_data(opt):
             ]
         )
 
+        from torchvision.datasets import MNIST
         dataset = {}
         dataset['train'] = MNIST(root='./data', train=True, download=True, transform=transform)
         dataset['test'] = MNIST(root='./data', train=False, download=True, transform=transform)
@@ -142,6 +142,11 @@ def load_data(opt):
             tst_lbl=dataset['test'].test_labels,
             abn_cls_idx=opt.anomaly_class
         )
+
+        # from .datasets import MNIST
+        # dataset = {}
+        # dataset['train'] = MNIST(opt, root='./data/mnist', split='train', transform=transform)
+        # dataset['test']  = MNIST(opt, root='./data/mnist', split='test',  transform=transform)
 
         dataloader = {x: torch.utils.data.DataLoader(dataset=dataset[x],
                                                      batch_size=opt.batchsize,

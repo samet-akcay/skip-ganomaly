@@ -23,7 +23,11 @@ class LossG:
     """ Loss val for netG
     """
     total: torch.Tensor = torch.empty(1)
+<<<<<<< HEAD
     bce  : torch.Tensor = torch.empty(1)
+=======
+    adv  : torch.Tensor = torch.empty(1)
+>>>>>>> v2
     rec  : torch.Tensor = torch.empty(1)
     enc  : torch.Tensor = torch.empty(1)
 

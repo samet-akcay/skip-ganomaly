@@ -42,20 +42,21 @@ class Options():
         self.parser.add_argument('--nc', type=int, default=3, help='input image channels')
         self.parser.add_argument('--nz', type=int, default=100, help='size of the latent z vector')
         self.parser.add_argument('--ngf', type=int, default=64)
+        self.parser.add_argument('--ndf', type=int, default=64)
         self.parser.add_argument('--norm', type=str, default='batch', help='Normalization method.')
         self.parser.add_argument('--use_dropout', type=bool, default=False)
+        self.parser.add_argument('--use_sigmoid', type=bool, default=True)        
         self.parser.add_argument('--init_type', type=str, default='normal', help='Network initialization.')
         self.parser.add_argument('--init_gain', type=float, default=0.02)
         self.parser.add_argument('--extralayers', type=int, default=0, help='Number of extra layers on gen and disc')
-        
-        # NetD
-        self.parser.add_argument('--netD', default='basic', help='Type of NetD')
-        self.parser.add_argument('--ndf', type=int, default=64)
-        self.parser.add_argument('--n_layers_D', type=int, default=3)
-        self.parser.add_argument('--use_sigmoid', type=bool, default=False)
-
-        # Display
-        self.parser.add_argument('--display_server', type=str, default="http://localhost", help='visdom server')
+        self.parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+        self.parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
+        self.parser.add_argument('--name', type=str, default='experiment_name', help='name of the experiment')
+        self.parser.add_argument('--model', type=str, default='ganomaly2', help='chooses which model to use. ganomaly')
+        self.parser.add_argument('--netG', default='unet', help='Type of NetG')
+        self.parser.add_argument('--netD', default='dcgan', help='Type of NetD')
+        self.parser.add_argument('--netD_training', default='fm', help='fm|bce NetD training type')
+        self.parser.add_argument('--display_server', type=str, default="http://localhost", help='visdom server of the web display')
         self.parser.add_argument('--display_port', type=int, default=8097, help='visdom port of the web display')
         self.parser.add_argument('--display_id', type=int, default=0, help='window id of the web display')
         self.parser.add_argument('--display', action='store_true', help='Use visdom.')
@@ -65,6 +66,7 @@ class Options():
         self.parser.add_argument('--proportion', type=float, default=0.1, help='Proportion of anomalies in test set.')
         self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric.')
         
+
         ##
         # Train
         self.parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
@@ -83,9 +85,14 @@ class Options():
         self.parser.add_argument('--w_enc', type=float, default=1,  help='Encoder loss for generator. default=500')
         self.parser.add_argument('--lr_policy', type=str, default='lambda', help='lambda|step|plateau')
         self.parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
-        self.parser.add_argument('--add_gaussian_noise', type=bool, default=True, help='Add Gaussian Noise to Input.')
+        self.parser.add_argument('--add_noise', type=bool, default=False, help='Add Gaussian Noise to Input.')
         self.parser.add_argument('--mean', type=float, default=0, help='Mean of the Gaussian Noise')
         self.parser.add_argument('--std', type=float, default=0.2, help='Standard deviation of the Gaussian Noise.')
+
+        self.parser.add_argument('--w_adv', type=float, default=1,  help='BCE loss for generator. default=500')
+        self.parser.add_argument('--w_rec', type=float, default=50, help='Reconstruction loss for generator. default=500')
+        self.parser.add_argument('--w_enc', type=float, default=1,  help='Encoder loss for generator. default=500')
+
         self.isTrain = True
         self.opt = None
 
