@@ -65,57 +65,89 @@ class MyMNIST(DatasetFolder):
         self.root = root
 
 m = MyMNIST(root='./data/mnist')
-d = DatasetFolder(root='./data/mnist', loader=default_loader, extensions='.png')
 
+def create_mnist_anomaly_dataset(samples, digit=0, version='v1', split='train', seed=0, proportion=0.1):
+    """ Create MNIST anomaly dataset.
+    
+    Arguments:
+        samples {[type]} -- [description]
+    
+    Keyword Arguments:
+        digit {int}         -- [description] (default: {0})
+        version {str}       -- [description] (default: {'v1'})
+        split {str}         -- [description] (default: {'train'})
+        seed {int}          -- [description] (default: {0})
+        proportion {float}  -- [description] (default: {0.1})
+    
+    Raises:
+        NotImplementedError -- [description]
+    
+    Returns:
+        [type] -- [description]
+    """
 
-digit = 0
-version = 'v1'
-proportion=0.1
-seed=0
+    # Define normality.
+    smp = samples
+    img = [s[0] for s in smp]
+    lbl = [s[1] for s in smp]
+    lbl = np.array(lbl)
 
-# Define normality.
-smp = m.samples
-nrm_cls_idx = digit
+    if version == 'v1':
+        # If version 1
+        nrm_idx = [i for i, v in enumerate(lbl) if v != digit]
+        abn_idx = [i for i, v in enumerate(lbl) if v == digit]
 
-img = [s[0] for s in smp]
-lbl = [s[1] for s in smp]
+        random.Random(seed).shuffle(nrm_idx)
+        random.Random(seed).shuffle(abn_idx)
 
-if version == 'v1':
-    # If version 1
-    nrm_idx = [i for i, v in enumerate(lbl) if v != digit]
-    abn_idx = [i for i, v in enumerate(lbl) if v == digit]
+    elif version == 'v2':
+        # If version 2
+        nrm_idx = [i for i, v in enumerate(lbl) if v == digit]
+        abn_idx = [i for i, v in enumerate(lbl) if v != digit]
 
+        random.Random(seed).shuffle(nrm_idx)
+        random.Random(seed).shuffle(abn_idx)    
 
-    random.Random(seed).shuffle(nrm_idx)
-    random.Random(seed).shuffle(abn_idx)
+        abn_idx = abn_idx[:int(len(abn_idx) * proportion)]
 
-elif version == 'v2':
-    # If version 2
-    nrm_idx = [i for i, v in enumerate(lbl) if v == digit]
-    abn_idx = [i for i, v in enumerate(lbl) if v != digit]
+    else:
+        raise NotImplementedError('v1 | v2 only.')    
 
-    random.Random(seed).shuffle(nrm_idx)
-    random.Random(seed).shuffle(abn_idx)    
+    # Split normal into train and test.
+    trn_nrm_idx = nrm_idx[:int(len(nrm_idx) * 0.8)]
+    tst_nrm_idx = nrm_idx[int(len(nrm_idx) * 0.8):]
 
-    abn_idx = abn_idx[:int(len(abn_idx) * proportion)]
+    tst_abn_idx = abn_idx
 
-else:
-    raise NotImplementedError('v1 | v2 only.')
+    trn_idx = trn_nrm_idx
+    tst_idx = tst_nrm_idx + tst_abn_idx
 
-# Split normal into train and test.
-trn_nrm_idx = nrm_idx[:int(len(nrm_idx) * 0.8)]
-tst_nrm_idx = nrm_idx[int(len(nrm_idx) * 0.8):]
+    # Normal and abnormal image and labels.
+    trn_img = [img[i] for i in trn_idx]
+    tst_img = [img[i] for i in tst_idx]
 
-tst_abn_idx = abn_idx
+    trn_lbl = lbl[trn_idx]
+    trn_lbl[:] = 0
 
-trn_idx = trn_nrm_idx
-tst_idx = tst_nrm_idx + tst_abn_idx
+    tst_nrm_img = [img[i] for i in tst_nrm_idx]
+    tst_abn_img = [img[i] for i in tst_abn_idx]
 
-# Normal and abnormal image and labels.
-trn_img = [img[i] for i in trn_idx]
-tst_img = [img[i] for i in tst_idx]
+    tst_nrm_lbl = lbl[tst_nrm_idx]
+    tst_abn_lbl = lbl[tst_abn_idx]
 
-trn_lbl = [lbl[i] for i in trn_idx]
-trn_nrm_lbl = [0 for i in trn_idx]
-# TODO: label normal0 0
-# Labels. Normal:(0) and Abnormal (1).
+    # New Labels: Normal (0), Abnormal (1)
+    tst_nrm_lbl[:] = 0
+    tst_abn_lbl[:] = 1
+
+    tst_nrm_lbl = tst_nrm_lbl.tolist()
+    tst_abn_lbl = tst_abn_lbl.tolist()
+
+    # 
+    tst_img = tst_nrm_img + tst_abn_img
+    tst_lbl = tst_nrm_lbl + tst_abn_lbl
+
+    # Train and Test samples in tuple.
+    trn_smp = [(trn_img[i], trn_lbl[i]) for i, v in enumerate(trn_img)]
+    tst_smp = [(tst_img[i], tst_lbl[i]) for i, v in enumerate(tst_img)]
+
+    return trn_smp if split=='train' else tst_smp
