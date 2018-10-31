@@ -63,16 +63,16 @@ def init_weights(net, init_type='normal', gain=0.02):
     net.apply(init_func)
 
 
-def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
-    if len(gpu_ids) > 0:
+def init_net(net, init_type='normal', init_gain=0.02, gpus=[]):
+    if len(gpus) > 0:
         assert(torch.cuda.is_available())
-        net.to(gpu_ids[0])
-        net = torch.nn.DataParallel(net, gpu_ids)
+        net.to(gpus[0])
+        net = torch.nn.DataParallel(net, gpus)
     init_weights(net, init_type, gain=init_gain)
     return net
 
 
-# def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[]):
+# def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpus=[]):
 def define_G(opt):
     net = None
     norm_layer = get_norm_layer(norm_type=opt.norm)
@@ -86,11 +86,11 @@ def define_G(opt):
         net = UnetGenerator(opt.nc, opt.nc, num_downs, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % opt.netG)
-    return init_net(net, opt.init_type, opt.init_gain, opt.gpu_ids)
+    return init_net(net, opt.init_type, opt.init_gain, opt.gpus)
 
 
 # def define_D(input_nc, ndf, netD,
-#              n_layers_D=3, norm='batch', use_sigmoid=False, init_type='normal', init_gain=0.02, gpu_ids=[]):
+#              n_layers_D=3, norm='batch', use_sigmoid=False, init_type='normal', init_gain=0.02, gpus=[]):
 def define_D(opt):
     net = None
     norm_layer = get_norm_layer(norm_type=opt.norm)
@@ -104,7 +104,7 @@ def define_D(opt):
         net = PixelDiscriminator(opt.nc, opt.ndf, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
     else:
         raise NotImplementedError('Discriminator model name [%s] is not recognized' % net)
-    return init_net(net, opt.init_type, opt.init_gain, opt.gpu_ids)
+    return init_net(net, opt.init_type, opt.init_gain, opt.gpus)
 
 
 ##############################################################################

@@ -31,7 +31,7 @@ from lib.evaluate import roc
 #         self.model = define_G(input_nc=opt.nc, output_nc=opt.nc, ngf=64,
 #                               which_model_netG='unet_32',
 #                               norm='batch', use_dropout=False, init_type='normal',
-#                               gpu_ids=opt.gpu_ids)
+#                               gpus=opt.gpus)
 
 #     def forward(self, x):
 #         latent_i = self.encoder1(x)
@@ -62,7 +62,7 @@ class Ganomaly12:
         self.trn_dir = os.path.join(self.opt.outf, self.opt.name, 'train')
         self.tst_dir = os.path.join(self.opt.outf, self.opt.name, 'test')
         self.device = torch.device(
-            "cuda:0" if self.opt.gpu_ids != -1 else "cpu")
+            "cuda:0" if self.opt.gpus != -1 else "cpu")
 
         # -- Discriminator attributes.
         self.out_d_real = None
@@ -94,7 +94,7 @@ class Ganomaly12:
         # self.netg = define_G(input_nc=self.opt.nc, output_nc=self.opt.nc, ngf=self.opt.ngf,
         #                      which_model_netG='unet_32',
         #                      norm='batch', use_dropout=False, init_type='normal',
-        #                      gpu_ids=opt.gpu_ids)
+        #                      gpus=opt.gpus)
         self.netd = NetDv2(self.opt).to(self.device)
         # self.netd2 = NetDv2(self.opt).to(self.device)
         self.netg.apply(weights_init)

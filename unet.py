@@ -191,7 +191,7 @@ from lib.models.networks import UnetGenerator, define_G
 from options import Options
 
 opt = Options().parse()
-device = torch.device("cuda:0" if opt.gpu_ids != -1 else "cpu")
+device = torch.device("cuda:0" if opt.gpus != -1 else "cpu")
 
 inp = torch.rand(size=(16, 3, 32, 32), dtype=torch.float32, device=device)
 netg = NetG_32().to(device)

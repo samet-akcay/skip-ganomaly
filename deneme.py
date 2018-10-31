@@ -41,7 +41,7 @@ class Input:
         img_type = torch.float32
         gts_size = (opt.batchsize,)
         gts_type = torch.long
-        device   = torch.device("cuda:0" if opt.gpu_ids != -1 else "cpu")
+        device   = torch.device("cuda:0" if opt.gpus != -1 else "cpu")
 
         self.img = torch.empty(size=img_size, dtype=img_type, device=device)
         self.gts = torch.empty(size=gts_size, dtype=gts_type, device=device)
@@ -51,7 +51,7 @@ class Output:
     def __init__(self, opt):
         img_size = (opt.batchsize, opt.nc, opt.isize, opt.isize)
         img_type = torch.float32      
-        device   = torch.device("cuda:0" if opt.gpu_ids != -1 else "cpu")
+        device   = torch.device("cuda:0" if opt.gpus != -1 else "cpu")
 
         self.img = torch.empty(size=img_size, dtype=img_type, device=device)
         self.real_feats = None

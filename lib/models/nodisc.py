@@ -41,7 +41,7 @@ class Nodisc:
         self.dataloader = dataloader
         self.trn_dir = os.path.join(self.opt.outf, self.opt.name, 'train')
         self.tst_dir = os.path.join(self.opt.outf, self.opt.name, 'test')
-        self.device = torch.device("cuda:0" if self.opt.gpu_ids!=-1 else "cpu")
+        self.device = torch.device("cuda:0" if self.opt.gpus!=-1 else "cpu")
 
         # -- Discriminator attributes.
         self.out_d_real = None

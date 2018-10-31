@@ -89,7 +89,7 @@ For more training options, run `python train.py -h` as shown below:
 usage: train.py [-h] [--dataset DATASET] [--dataroot DATAROOT]
                 [--batchsize BATCHSIZE] [--workers WORKERS] [--droplast]
                 [--isize ISIZE] [--nc NC] [--nz NZ] [--ngf NGF] [--ndf NDF]
-                [--extralayers EXTRALAYERS] [--gpu_ids GPU_IDS] [--ngpu NGPU]
+                [--extralayers EXTRALAYERS] [--gpus gpus] [--ngpu NGPU]
                 [--name NAME] [--model MODEL]
                 [--display_server DISPLAY_SERVER]
                 [--display_port DISPLAY_PORT] [--display_id DISPLAY_ID]
@@ -113,7 +113,7 @@ optional arguments:
   --ngf                 Number of features of the generator network
   --ndf                 Number of features of the discriminator network.
   --extralayers         Number of extra layers on gen and disc (default: 0)
-  --gpu_ids             gpu ids: e.g. 0 0,1,2, 0,2. use -1 for CPU (default: 0)
+  --gpus             gpu ids: e.g. 0 0,1,2, 0,2. use -1 for CPU (default: 0)
   --ngpu                number of GPUs to use (default: 1)
   --name                name of the experiment (default: experiment_name)
   --model               chooses which model to use. (default:ganomaly)

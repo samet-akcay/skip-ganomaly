@@ -15,7 +15,7 @@ import torch.optim as optim
 import torchvision.utils as vutils
 
 from lib.loss import Loss
-from lib.evaluate import roc
+from lib.evaluate import roc, evaluate
 from lib.visualizer import Visualizer
 from lib.models.networks import define_D, define_G, get_scheduler
 
@@ -32,7 +32,7 @@ class Ganomaly2:
         self.opt = opt
         self.visualizer = Visualizer(opt)
         self.dataloader = dataloader
-        self.device = torch.device("cuda:0" if self.opt.gpu_ids != -1 else "cpu")
+        self.device = torch.device("cuda:0" if self.opt.gpus != -1 else "cpu")
 
         # Input, output and loss variables.
         self.input = Input(opt)
@@ -426,7 +426,7 @@ class Ganomaly2:
                                       (dst, i+1), normalize=True)
                     vutils.save_image(fake, '%s/fake_%03d.eps' %
                                       (dst, i+1), normalize=True)
-                if self.total_steps % self.opt.save_image_freq == 0:
+                if self.steps % self.opt.save_image_freq == 0:
                     reals, fakes, fixed = self.get_current_images()
                     if self.opt.display:
                         self.visualizer.display_current_images(reals, fakes, fixed, win=5, title='Test')
@@ -489,7 +489,7 @@ class Input:
         img_type = torch.float32
         gts_size = (opt.batchsize,)
         gts_type = torch.long
-        device   = torch.device("cuda:0" if opt.gpu_ids != -1 else "cpu")
+        device   = torch.device("cuda:0" if opt.gpus != -1 else "cpu")
 
         self.img = torch.empty(size=img_size, dtype=img_type, device=device)
         self.gts = torch.empty(size=gts_size, dtype=gts_type, device=device)
@@ -505,7 +505,7 @@ class Output:
     def __init__(self, opt):
         img_size = (opt.batchsize, opt.nc, opt.isize, opt.isize)
         img_type = torch.float32      
-        device   = torch.device("cuda:0" if opt.gpu_ids != -1 else "cpu")
+        device   = torch.device("cuda:0" if opt.gpus != -1 else "cpu")
 
         self.img = torch.empty(size=img_size, dtype=img_type, device=device)
         self.real_feats = None

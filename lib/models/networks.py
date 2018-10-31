@@ -28,7 +28,7 @@ def define_G(opt):
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % opt.netG)
     
-    return init_net(netG, opt.init_type, opt.gpu_ids)
+    return init_net(netG, opt.init_type, opt.gpus)
 
 ##
 def define_D(opt):
@@ -43,7 +43,7 @@ def define_D(opt):
         netD = PixelDiscriminator(opt.nc, opt.ndf, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
     else:
         raise NotImplementedError(f'Discriminator model name {netD} is not recognized')
-    return init_net(netD, opt.init_type, opt.gpu_ids)
+    return init_net(netD, opt.init_type, opt.gpus)
 
 ##
 def weights_init(mod):
@@ -368,11 +368,11 @@ def init_weights(net, init_type='normal', gain=0.02):
     net.apply(init_func)
 
 
-def init_net(net, init_type='normal', gpu_ids=[], initialize_weights=True):
-    if len(gpu_ids) > 0:
+def init_net(net, init_type='normal', gpus=[], initialize_weights=True):
+    if len(gpus) > 0:
         assert(torch.cuda.is_available())
-        net.to(gpu_ids[0])
-        net = torch.nn.DataParallel(net, gpu_ids)
+        net.to(gpus[0])
+        net = torch.nn.DataParallel(net, gpus)
     if initialize_weights:
         init_weights(net, init_type)
     return net
