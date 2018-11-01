@@ -155,6 +155,7 @@ def load_data(opt):
                                                      drop_last=drop_last_batch[x]) for x in splits}
         return dataloader
     elif opt.dataset in ['mnist2']:
+        from torchvision.datasets import MNIST
         from .datasets import get_mnist2_anomaly_dataset
         opt.anomaly_class = int(opt.anomaly_class)
 

@@ -10,6 +10,8 @@ import torch.nn.parallel
 import functools
 from torch.optim import lr_scheduler
 from torch.nn import init
+import torch.nn.functional as F
+
 
 ##
 def define_G(opt):
@@ -263,18 +265,18 @@ class NetD(nn.Module):
 
         return classifier, features
 
-##
-class DCGAN(nn.Module):
-    """
-    GENERATOR NETWORK
-    """
-    def __init__(self, opt):
-        super(DCGAN, self).__init__()
-        self.encoder = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-        self.decoder = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+# ##
+# class DCGAN(nn.Module):
+#     """
+#     GENERATOR NETWORK
+#     """
+#     def __init__(self, opt):
+#         super(DCGAN, self).__init__()
+#         self.encoder = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+#         self.decoder = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
 
-    def forward(self, x):
-        return self.decoder(self.encoder(x))
+#     def forward(self, x):
+#         return self.decoder(self.encoder(x))
 
 ##
 class NetG(nn.Module):
@@ -294,7 +296,7 @@ class NetG(nn.Module):
         latent_o = self.encoder2(gen_imag)
         return gen_imag, latent_i, latent_o
 
-##
+#
 class DCGAN(nn.Module):
     """
     GENERATOR NETWORK
@@ -302,16 +304,15 @@ class DCGAN(nn.Module):
 
     def __init__(self, opt):
         super(DCGAN, self).__init__()
-        self.encoder = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-        self.decoder = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-        # self.encoder2 = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.encoder  = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.decoder  = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.encoder2 = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
 
     def forward(self, x):
         latent_i = self.encoder(x)
         gen_imag = self.decoder(latent_i)
-        # latent_o = self.encoder2(gen_imag)
-        # return gen_imag, latent_i, latent_o
-        return gen_imag
+        latent_o = self.encoder2(gen_imag)
+        return gen_imag, latent_i, latent_o
 
 # = = = = = = = = = #
 # Helper Functions  #
@@ -713,13 +714,13 @@ class NetG_32(nn.Module):
         self.down2 = DownConv(128, 256)
         self.down3 = DownConv(256, 512)
         self.down4 = DownConv(512, 512)
-        # self.bneck = FeatConv(512, nz)
+        self.bneck = FeatConv(512, nz)
         self.up1 = UpConv(1024, 256)
         self.up2 = UpConv(512, 128)
-        self.up3 = OutConv(128, 64)
-        self.up4 = OutConv(64, 64)
-        # self.up3 = UpConv(256, 64)    # TODO This is OutConv
-        # self.up4 = UpConv(128, 64)    # TODO This is OutConv
+        # self.up3 = OutConv(128, 64)
+        # self.up4 = OutConv(64, 64)
+        self.up3 = UpConv(256, 64)    # TODO This is OutConv
+        self.up4 = UpConv(128, 64)    # TODO This is OutConv
         self.outc = OutConv(64, n_classes)
 
         # # Feature Encoder layers.
@@ -736,14 +737,14 @@ class NetG_32(nn.Module):
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         x5 = self.down4(x4)
-        # z = self.bneck(x5)
-        x = self.up1(x5, x4)
-        x = self.up2(x, x3)
-        x = self.up3(x) # TODO This is OutConv
-        x = self.up4(x) # TODO This is OutConv
-        # xu3 = self.up3(xu2, x2) # TODO This is OutConv
-        # xu4 = self.up4(xu3, x1) # TODO This is OutConv
-        xu5 = self.outc(x)
+        z = self.bneck(x5)
+        xu1 = self.up1(x5, x4)
+        xu2 = self.up2(xu1, x3)
+        # x = self.up3(x) # TODO This is OutConv
+        # x = self.up4(x) # TODO This is OutConv
+        xu3 = self.up3(xu2, x2) # TODO This is OutConv
+        xu4 = self.up4(xu3, x1) # TODO This is OutConv
+        xu5 = self.outc(xu4)
         # z_ = self.enc0(x)
         # z_ = self.enc1(z_)
         # z_ = self.enc2(z_)

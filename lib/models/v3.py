@@ -19,16 +19,17 @@ from lib.evaluate import roc, evaluate
 from lib.visualizer import Visualizer
 from lib.models.networks import define_D, define_G, get_scheduler
 
+
 ##
-class Ganomaly2:
+class v3:
     """GANomaly Class
     """
 
     def __init__(self, opt, dataloader=None):
-        super(Ganomaly2, self).__init__()
+        super(v3, self).__init__()
         ##
         # Initalize variables.
-        self.name = 'ganomaly2'
+        self.name = 'v3'
         self.opt = opt
         self.visualizer = Visualizer(opt)
         self.dataloader = dataloader
@@ -134,54 +135,6 @@ class Ganomaly2:
 
         self.loss.g.total.backward()
         self.optimizer_g.step()
-
-    # ##
-    # def update_netd(self):
-    #     """
-    #     Update D network: Ladv = |f(real) - f(fake)|_2
-    #     """
-    #     ##
-    #     # Feature Matching.
-    #     self.netd.zero_grad()
-    #     # --
-    #     # Train with real
-    #     self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.real_lbl)
-    #     self.output.real_score, self.output.real_feats = self.netd(self.input.img + self.input.noi)
-
-    #     # --
-    #     # Train with fake
-    #     self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.fake_lbl)
-    #     self.output.img = self.netg(self.input.img + self.input.noi)
-    #     self.output.fake_score, self.output.fake_feats = self.netd(self.output.img.detach())
-
-    #     # --
-    #     # Compute Loss and Backward-Pass.
-    #     self.loss.g.enc   = self.opt.w_enc  * self.loss.l2(self.output.fake_feats, self.output.real_feats)
-    #     # self.loss.d.total = self.loss.l2(self.output.real_feats, self.output.fake_feats)
-    #     self.loss.d.total = self.loss.g.enc
-    #     self.loss.d.real = self.loss.d.total
-    #     self.loss.d.fake = self.loss.d.total
-    #     self.loss.d.total.backward(retain_graph=True)
-    #     self.optimizer_d.step()
-    # 
-    # ##
-    # def update_netg(self):
-    #     """
-    #     # ============================================================ #
-    #     # (2) Update G network: log(D(G(z)))  + ||G(z) - x||           #
-    #     # ============================================================ #
-    #     """
-    #     self.netg.zero_grad()
-    #     self.input.lbl.data.resize_(self.opt.batchsize).fill_(self.input.real_lbl)
-    #     self.output.fake_score, self.output.fake_feats = self.netd(self.output.img)
-
-    #     self.loss.g.adv   = self.opt.w_adv  * self.loss.bce(self.output.fake_score, self.input.lbl)
-    #     self.loss.g.rec   = self.opt.w_rec  * self.loss.l1(self.output.img, self.input.img)
-    #     self.loss.g.total = self.loss.g.adv + self.loss.g.rec + self.loss.g.enc
-
-    #     self.loss.g.total.backward(retain_graph=False)
-    #     self.optimizer_g.step()
-
 
     ##
     def reinitialize_netd(self):
