@@ -14,18 +14,21 @@ import torch.nn.functional as F
 
 
 ##
-def define_G(opt):
+def define_G(opt, net=None):
+    if net is None: net = opt.netG
     netG = None
     norm_layer = get_norm_layer(norm_type=opt.norm)
     num_downs = int(np.log2(opt.isize))
 
-    if opt.netG == 'resnet_9blocks':
+    if net == 'resnet_9blocks':
         netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout, n_blocks=9)
-    elif opt.netG == 'resnet_6blocks':
+    elif net == 'resnet_6blocks':
         netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout, n_blocks=6)
-    elif opt.netG == 'unet':
+    elif net == 'unet':
         netG = UnetGenerator(opt.nc, opt.nc, num_downs, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout)
-    elif opt.netG == 'dcgan':
+    elif net == 'unet32':
+        netG = UNet32(n_channels=opt.nc, n_classes=opt.nc, nz=opt.nz)
+    elif net == 'dcgan':
         netG = DCGAN(opt)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % opt.netG)
@@ -296,23 +299,20 @@ class NetG(nn.Module):
         latent_o = self.encoder2(gen_imag)
         return gen_imag, latent_i, latent_o
 
-#
+##
 class DCGAN(nn.Module):
     """
     GENERATOR NETWORK
     """
-
     def __init__(self, opt):
         super(DCGAN, self).__init__()
-        self.encoder  = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-        self.decoder  = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-        self.encoder2 = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.encoder = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.decoder = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
 
     def forward(self, x):
-        latent_i = self.encoder(x)
-        gen_imag = self.decoder(latent_i)
-        latent_o = self.encoder2(gen_imag)
-        return gen_imag, latent_i, latent_o
+        z = self.encoder(x)
+        x = self.decoder(z)
+        return x, z
 
 # = = = = = = = = = #
 # Helper Functions  #
@@ -704,9 +704,10 @@ class PixelDiscriminator(nn.Module):
 
 #         return x, z, z_
 
-class NetG_32(nn.Module):
+##
+class UNet32(nn.Module):
     def __init__(self, n_channels=3, n_classes=3, nz=512):
-        super(NetG_32, self).__init__()
+        super(UNet32, self).__init__()
 
         # UNET style Autoencoder layers.
         self.inc = InpConv(n_channels, 64)
@@ -731,6 +732,27 @@ class NetG_32(nn.Module):
         # self.enc4 = DownConv(512, 512)
         # self.bneck_ = FeatConv(512, nz)
 
+    # def forward(self, x):
+    #     x1 = self.inc(x)
+    #     x2 = self.down1(x1)
+    #     x3 = self.down2(x2)
+    #     x4 = self.down3(x3)
+    #     x5 = self.down4(x4)
+    #     z = self.bneck(x5)
+    #     xu1 = self.up1(x5, x4)
+    #     xu2 = self.up2(xu1, x3)
+    #     # x = self.up3(x) # TODO This is OutConv
+    #     # x = self.up4(x) # TODO This is OutConv
+    #     xu3 = self.up3(xu2, x2) # TODO This is OutConv
+    #     xu4 = self.up4(xu3, x1) # TODO This is OutConv
+    #     xu5 = self.outc(xu4)
+    #     # z_ = self.enc0(x)
+    #     # z_ = self.enc1(z_)
+    #     # z_ = self.enc2(z_)
+    #     # z_ = self.enc3(z_)
+    #     # z_ = self.enc4(z_)
+    #     # z_ = self.bneck_(z_)
+
     def forward(self, x):
         x1 = self.inc(x)
         x2 = self.down1(x1)
@@ -738,13 +760,13 @@ class NetG_32(nn.Module):
         x4 = self.down3(x3)
         x5 = self.down4(x4)
         z = self.bneck(x5)
-        xu1 = self.up1(x5, x4)
-        xu2 = self.up2(xu1, x3)
+        x = self.up1(x5, x4)
+        x = self.up2(x, x3)
         # x = self.up3(x) # TODO This is OutConv
         # x = self.up4(x) # TODO This is OutConv
-        xu3 = self.up3(xu2, x2) # TODO This is OutConv
-        xu4 = self.up4(xu3, x1) # TODO This is OutConv
-        xu5 = self.outc(xu4)
+        x = self.up3(x, x2) # TODO This is OutConv
+        x = self.up4(x, x1) # TODO This is OutConv
+        x = self.outc(x)
         # z_ = self.enc0(x)
         # z_ = self.enc1(z_)
         # z_ = self.enc2(z_)
@@ -752,9 +774,10 @@ class NetG_32(nn.Module):
         # z_ = self.enc4(z_)
         # z_ = self.bneck_(z_)
 
+
         # return x, z, z_
         # return xu5, xu4, xu3, xu2, xu1, x5, x4, x3, x2, x1
-        return xu5
+        return x, z
 
 class InpConv(nn.Module):
     def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):

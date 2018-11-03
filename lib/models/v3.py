@@ -9,24 +9,27 @@ import numpy as np
 from tqdm import tqdm
 from collections import OrderedDict
 
+from dataclasses import dataclass
+from dataclasses import asdict
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils as vutils
 
-from lib.loss import Loss
+# from lib.loss import Loss
 from lib.evaluate import roc, evaluate
 from lib.visualizer import Visualizer
 from lib.models.networks import define_D, define_G, get_scheduler
 
 
 ##
-class v3:
+class V3:
     """GANomaly Class
     """
 
     def __init__(self, opt, dataloader=None):
-        super(v3, self).__init__()
+        super(V3, self).__init__()
         ##
         # Initalize variables.
         self.name = 'v3'
@@ -46,24 +49,26 @@ class v3:
         self.steps = 0
 
         ## Create and Load Models.
-        self.netg = define_G(opt)
-        # self.netd = NetDv2(self.opt).to(self.device)
-        self.netd = define_D(opt)
-        # TODO: Create define_D function
+        self.netg1 = define_G(opt, net='dcgan')
+        self.netg2 = define_G(opt, net='unet32')
+        self.netd  = define_D(opt)
 
         ##
         if self.opt.resume != '': self.load_weights(path=self.opt.resume)
-        print(self.netg)
+        print(self.netg1)
+        print(self.netg2)
         print(self.netd)
 
         ##
         # Setup optimizer
         if self.opt.isTrain:
-            self.netg.train()
+            self.netg1.train()
+            self.netg2.train()
             self.netd.train()
             self.optimizers  = []
             self.optimizer_d = optim.Adam(self.netd.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
-            self.optimizer_g = optim.Adam(self.netg.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
+            self.optimizer_g = optim.Adam(list(self.netg1.parameters()) + list(self.netg2.parameters()),
+                                          lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
             self.optimizers.append(self.optimizer_d)
             self.optimizers.append(self.optimizer_g)
             self.schedulers = [get_scheduler(optimizer, opt) for optimizer in self.optimizers]
@@ -261,7 +266,8 @@ class v3:
         """ Train the model for one epoch.
         """
 
-        self.netg.train()
+        self.netg1.train()
+        self.netg2.train()
         epoch_iter = 0
         for data in tqdm(self.dataloader['train'], leave=False, total=len(self.dataloader['train'])):
             self.steps += self.opt.batchsize
@@ -466,3 +472,52 @@ class Output:
         self.fake_feats = None
         self.real_score = torch.empty(size=(opt.batchsize,), dtype=torch.float32, device=device)
         self.fake_score = torch.empty(size=(opt.batchsize,), dtype=torch.float32, device=device)
+
+
+# # # # # 
+# LOSS  #
+# # # # # 
+##
+@dataclass
+class LossD:
+    """ Loss val for netD
+    """
+    total: torch.Tensor = torch.empty(1)
+    real : torch.Tensor = torch.empty(1)
+    fake : torch.Tensor = torch.empty(1)
+
+@dataclass
+class LossG1:
+    """ Losses for G1 (DCGAN)
+    """
+    tot: torch.Tensor = torch.empty(1)
+    adv: torch.Tensor = torch.empty(1)
+    rec: torch.Tensor = torch.empty(1)
+
+@dataclass
+class LossG2:
+    """ Losses for G2 (UNET)
+    """
+    tot: torch.Tensor = torch.empty(1)
+    adv: torch.Tensor = torch.empty(1)
+
+@dataclass
+class LossG:
+    """ Loss val for netG
+    """
+    total: torch.Tensor = torch.empty(1)
+    rec  : torch.Tensor = torch.empty(1)
+    enc  : torch.Tensor = torch.empty(1)
+    g1   : type(LossG1) = LossG1
+    g2   : type(LossG2) = LossG2
+
+@dataclass
+class Loss:
+    # Loss Values
+    d: type(LossD) = LossD()
+    g: type(LossG) = LossG()
+
+    # Loss Functions
+    bce: type(torch.nn.BCELoss()) = torch.nn.BCELoss()
+    l1 : type(torch.nn.L1Loss())  = torch.nn.L1Loss()
+    l2 : type(torch.nn.MSELoss()) = torch.nn.MSELoss()
