@@ -40,4 +40,4 @@ dataloader = load_data(opt)
 model = load_model(opt, dataloader)
 ##
 # TRAIN MODEL
-# model.train()
+model.train()

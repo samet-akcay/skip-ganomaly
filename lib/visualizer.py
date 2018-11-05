@@ -27,6 +27,7 @@ class Visualizer():
         self.win_size = 256
         self.name = opt.name
         self.opt = opt
+        self.win = 0
         if self.opt.display:
             import visdom
             self.vis = visdom.Visdom(server=opt.display_server, port=opt.display_port)
@@ -65,7 +66,7 @@ class Visualizer():
         return (inp - inp.min()) / (inp.max() - inp.min() + 1e-5)
 
     ##
-    def plot_current_errors(self, epoch, counter_ratio, errors):
+    def plot_current_errors(self, epoch, counter_ratio, errors, win=0):
         """Plot current errros.
 
         Args:
@@ -73,7 +74,6 @@ class Visualizer():
             counter_ratio (float): Ratio to plot the range between two epoch.
             errors (OrderedDict): Error for the current epoch.
         """
-
         if not hasattr(self, 'plot_data') or self.plot_data is None:
             self.plot_data = {'X': [], 'Y': [], 'legend': list(errors.keys())}
         self.plot_data['X'].append(epoch + counter_ratio)
@@ -87,7 +87,7 @@ class Visualizer():
                 'xlabel': 'Epoch',
                 'ylabel': 'Loss'
             },
-            win=4
+            win=win
         )
 
     ##
@@ -152,7 +152,7 @@ class Visualizer():
         with open(self.log_name, "a") as log_file:
             log_file.write('%s\n' % message)
 
-    def display_current_images(self, reals, fakes, fixed, win=0, title='Train'):
+    def display_current_images(self, images, win=0, title='Train'):
         """ Display current images.
 
         Args:
@@ -162,12 +162,16 @@ class Visualizer():
             fakes ([FloatTensor]): Fake Image
             fixed ([FloatTensor]): Fixed Fake Image
         """
-        reals = self.normalize(reals.cpu().numpy())
-        fakes = self.normalize(fakes.cpu().numpy())
+        for key, val in images.items():
+            image = self.normalize(val.cpu().numpy())
+            self.vis.images(image, win=win+1, opts={'title': f"{title} {key}"}) 
+            win += 1
+        # reals = self.normalize(reals.cpu().numpy())
+        # fakes = self.normalize(fakes.cpu().numpy())
         # fixed = self.normalize(fixed.cpu().numpy())
 
-        self.vis.images(reals, win=win+1, opts={'title': f'{title} Reals'})
-        self.vis.images(fakes, win=win+2, opts={'title': f'{title} Fakes'})
+        # self.vis.images(reals, win=win+1, opts={'title': f'{title} Reals'})
+        # self.vis.images(fakes, win=win+2, opts={'title': f'{title} Fakes'})
         # self.vis.images(fixed, win=3, opts={'title': 'Fixed'})
 
 

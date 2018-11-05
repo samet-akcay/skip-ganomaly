@@ -75,14 +75,18 @@ class Options():
         self.parser.add_argument('--niter_decay', type=int, default=100, help='# of iter to linearly decay learning rate to zero')
         self.parser.add_argument('--beta1', type=float, default=0.5, help='momentum term of adam')
         self.parser.add_argument('--lr', type=float, default=0.0002, help='initial learning rate for adam')
-        self.parser.add_argument('--w_adv', type=float, default=1,  help='BCE loss for generator. default=1')
-        self.parser.add_argument('--w_rec', type=float, default=50, help='Reconstruction loss for generator. default=500')
-        self.parser.add_argument('--w_enc', type=float, default=1,  help='Encoder loss for generator. default=500')
         self.parser.add_argument('--lr_policy', type=str, default='lambda', help='lambda|step|plateau')
         self.parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
         self.parser.add_argument('--add_noise', type=bool, default=False, help='Add Gaussian Noise to Input.')
         self.parser.add_argument('--mean', type=float, default=0, help='Mean of the Gaussian Noise')
         self.parser.add_argument('--std', type=float, default=0.2, help='Standard deviation of the Gaussian Noise.')
+
+        self.parser.add_argument('--w_rec', type=float, default=1, help='Reconstruction loss for generator. default=500')
+        self.parser.add_argument('--w_enc', type=float, default=1,  help='Encoder loss for generator. default=500')
+        self.parser.add_argument('--w_g1_adv', type=float, default=1,  help='Adversarial loss for generator 1. default=1')
+        self.parser.add_argument('--w_g2_adv', type=float, default=1,  help='Adversarial loss for generator 1. default=1')  
+        self.parser.add_argument('--w_g1_rec', type=float, default=1, help='Reconstruction loss for generator. default=50')              
+  
 
         self.isTrain = True
         self.opt = None
