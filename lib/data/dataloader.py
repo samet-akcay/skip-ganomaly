@@ -78,7 +78,7 @@ def load_data(opt):
         from .datasets import get_cifar_anomaly_dataset
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
-        shuffle = {'train': True, 'test': True}
+        shuffle = {'train': True, 'test': False}
 
         transform = transforms.Compose(
             [
@@ -119,7 +119,7 @@ def load_data(opt):
 
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
-        shuffle = {'train': True, 'test': True}
+        shuffle = {'train': True, 'test': False}
 
         transform = transforms.Compose(
             [
@@ -161,7 +161,7 @@ def load_data(opt):
 
         splits = ['train', 'test']
         drop_last_batch = {'train': True, 'test': False}
-        shuffle = {'train': True, 'test': True}
+        shuffle = {'train': True, 'test': False}
 
         transform = transforms.Compose(
             [
