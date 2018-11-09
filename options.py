@@ -36,7 +36,7 @@ class Options():
         self.parser.add_argument('--name', type=str, default='experiment_name', help='name of the experiment')
         
         # NetG
-        self.parser.add_argument('--model', type=str, default='ganomaly2', help='chooses which model to use. ganomaly')
+        self.parser.add_argument('--model', type=str, default='ganomaly3', help='chooses which model to use. ganomaly')
         self.parser.add_argument('--isize', type=int, default=32, help='input image size.')
         self.parser.add_argument('--nc', type=int, default=3, help='input image channels')
         self.parser.add_argument('--nz', type=int, default=100, help='size of the latent z vector')
@@ -83,6 +83,7 @@ class Options():
 
         self.parser.add_argument('--w_rec', type=float, default=1, help='Reconstruction loss for generator. default=500')
         self.parser.add_argument('--w_enc', type=float, default=1,  help='Encoder loss for generator. default=500')
+        self.parser.add_argument('--w_adv', type=float, default=1,  help='Encoder loss for generator. default=500')        
         self.parser.add_argument('--w_g1_adv', type=float, default=1,  help='Adversarial loss for generator 1. default=1')
         self.parser.add_argument('--w_g2_adv', type=float, default=1,  help='Adversarial loss for generator 1. default=1')  
         self.parser.add_argument('--w_g1_rec', type=float, default=1, help='Reconstruction loss for generator. default=50')              

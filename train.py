@@ -1,16 +1,16 @@
-"""
-TRAIN GANOMALY
+# """
+# TRAIN GANOMALY
 
-. Example: Run the following command from the terminal.
-    run train.py                             \
-        --model ganomaly                        \
-        --dataset UCSD_Anomaly_Dataset/UCSDped1 \
-        --batchsize 32                          \
-        --isize 256                         \
-        --nz 512                                \
-        --ngf 64                               \
-        --ndf 64
-"""
+# . Example: Run the following command from the terminal.
+#     run train.py                             \
+#         --model ganomaly                        \
+#         --dataset UCSD_Anomaly_Dataset/UCSDped1 \
+#         --batchsize 32                          \
+#         --isize 256                         \
+#         --nz 512                                \
+#         --ngf 64                               \
+#         --ndf 64
+# """
 
 
 ##

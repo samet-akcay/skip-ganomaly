@@ -32,12 +32,11 @@ def define_G(opt, net=None):
         netG = DCGAN(opt)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % opt.netG)
-    
+
     return init_net(netG, opt.init_type, opt.gpus)
 
 ##
 def define_D(opt):
-    netD = None
     norm_layer = get_norm_layer(norm_type=opt.norm)
 
     if opt.netD == 'dcgan':
@@ -77,10 +76,8 @@ class Encoder(nn.Module):
 
         main = nn.Sequential()
         # input is nc x isize x isize
-        main.add_module('initial-conv-{0}-{1}'.format(nc, ndf),
-                        nn.Conv2d(nc, ndf, 4, 2, 1, bias=False))
-        main.add_module('initial-relu-{0}'.format(ndf),
-                        nn.LeakyReLU(0.2, inplace=True))
+        main.add_module('initial-conv-{0}-{1}'.format(nc, ndf), nn.Conv2d(nc, ndf, 4, 2, 1, bias=False))
+        main.add_module('initial-relu-{0}'.format(ndf), nn.LeakyReLU(0.2, inplace=True))
         csize, cndf = isize / 2, ndf
 
         # Extra layers
