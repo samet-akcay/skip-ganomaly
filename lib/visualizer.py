@@ -175,7 +175,7 @@ class Visualizer():
         # self.vis.images(fixed, win=3, opts={'title': 'Fixed'})
 
 
-    def save_current_images(self, epoch, reals, fakes, fixed):
+    def save_current_images(self, epoch, images):
         """ Save images for epoch i.
 
         Args:
@@ -184,6 +184,6 @@ class Visualizer():
             fakes ([FloatTensor]): Fake Image
             fixed ([FloatTensor]): Fixed Fake Image
         """
-        vutils.save_image(reals, '%s/reals.png' % self.img_dir, normalize=True)
-        vutils.save_image(fakes, '%s/fakes.png' % self.img_dir, normalize=True)
-        vutils.save_image(fixed, '%s/fixed_fakes_%03d.png' %(self.img_dir, epoch+1), normalize=True)
+        vutils.save_image(images['reals'], '%s/reals.png' % self.img_dir, normalize=True)
+        vutils.save_image(images['fakes'], '%s/fakes.png' % self.img_dir, normalize=True)
+        vutils.save_image(images['fixed'], '%s/fixed_fakes_%03d.png' %(self.img_dir, epoch+1), normalize=True)

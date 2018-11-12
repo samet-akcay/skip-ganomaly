@@ -302,17 +302,18 @@ class Ganomaly3:
             [OrderedDict]: Dictionary containing errors.
         """
 
-        errors = OrderedDict([
-            ('loss.d_hid', self.loss.d_hid.item()),
-            ('loss.d_out', self.loss.d_out.item()),            
-            ('loss.g',     self.loss.g.item()),
-            ('loss.g.rec', self.loss.g_rec.item()),
-            ('loss.g.enc', self.loss.g_enc.item()),
-            ('loss.g.hid', self.loss.g_hid.item()),
-            ('loss.g.out', self.loss.g_out.item())
-        ])
+        # errors = OrderedDict([
+        #     ('loss.d_hid', self.loss.d_hid.item()),
+        #     ('loss.d_out', self.loss.d_out.item()),            
+        #     ('loss.g',     self.loss.g.item()),
+        #     ('loss.g.rec', self.loss.g_rec.item()),
+        #     ('loss.g.enc', self.loss.g_enc.item()),
+        #     ('loss.g.hid', self.loss.g_hid.item()),
+        #     ('loss.g.out', self.loss.g_out.item())
+        # ])
 
-        return errors
+        # return errors
+        return {i: getattr(self.loss, i).item()  for i in dir(self.loss) if not i.startswith('_')}
 
     ##
     def get_current_images(self):
@@ -492,8 +493,8 @@ class Ganomaly3:
                 lat = (self.hid.vec - self.out.vec).view(sz[0], sz[1] * sz[2] * sz[3])
                 rec = torch.mean(torch.pow(rec, 2), dim=1)
                 lat = torch.mean(torch.pow(lat, 2), dim=1)
-                error = 0.9*rec + 0.1*lat
-                error = lat
+                error = 0.1*rec + 0.9*lat
+                # error = lat
                 # TODO: Anomaly score has been changed.
                 # error = self.out.fake_score
                 time_o = time.time()
