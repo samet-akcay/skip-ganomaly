@@ -3,51 +3,13 @@
 # pylint: disable=W0221,W0622,C0103,R0913
 
 ##
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.parallel
 import functools
 from torch.optim import lr_scheduler
 from torch.nn import init
-import torch.nn.functional as F
-
-
-##
-def define_G(opt, net=None):
-    if net is None: net = opt.netG
-    netG = None
-    norm_layer = get_norm_layer(norm_type=opt.norm)
-    num_downs = int(np.log2(opt.isize))
-
-    if net == 'resnet_9blocks':
-        netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout, n_blocks=9)
-    elif net == 'resnet_6blocks':
-        netG = ResnetGenerator(opt.nc, opt.nc, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout, n_blocks=6)
-    elif net == 'unet':
-        netG = UnetGenerator(opt.nc, opt.nc, num_downs, opt.ngf, norm_layer=norm_layer, use_dropout=opt.use_dropout)
-    elif net == 'unet32':
-        netG = UNet32(n_channels=opt.nc, n_classes=opt.nc, nz=opt.nz)
-    elif net == 'dcgan':
-        netG = DCGAN(opt)
-    else:
-        raise NotImplementedError('Generator model name [%s] is not recognized' % opt.netG)
-
-    return init_net(netG, opt.init_type, opt.gpus)
-
-##
-def define_D(opt):
-    norm_layer = get_norm_layer(norm_type=opt.norm)
-
-    if opt.netD == 'dcgan':
-        netD = NetDv2(opt)
-    elif opt.netD == 'basic':
-        netD = NLayerDiscriminator(opt.nc, opt.ndf, n_layers=3, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
-    elif opt.netD == 'pixel':
-        netD = PixelDiscriminator(opt.nc, opt.ndf, norm_layer=norm_layer, use_sigmoid=opt.use_sigmoid)
-    else:
-        raise NotImplementedError(f'Discriminator model name {netD} is not recognized')
-    return init_net(netD, opt.init_type, opt.gpus)
+import numpy as np
 
 ##
 def weights_init(mod):
@@ -76,8 +38,10 @@ class Encoder(nn.Module):
 
         main = nn.Sequential()
         # input is nc x isize x isize
-        main.add_module('initial-conv-{0}-{1}'.format(nc, ndf), nn.Conv2d(nc, ndf, 4, 2, 1, bias=False))
-        main.add_module('initial-relu-{0}'.format(ndf), nn.LeakyReLU(0.2, inplace=True))
+        main.add_module('initial-conv-{0}-{1}'.format(nc, ndf),
+                        nn.Conv2d(nc, ndf, 4, 2, 1, bias=False))
+        main.add_module('initial-relu-{0}'.format(ndf),
+                        nn.LeakyReLU(0.2, inplace=True))
         csize, cndf = isize / 2, ndf
 
         # Extra layers
@@ -175,12 +139,12 @@ class Decoder(nn.Module):
 
 
 ##
-class NetDv2(nn.Module):
+class BasicDiscriminator(nn.Module):
     """
     NETD
     """
     def __init__(self, opt):
-        super(NetDv2, self).__init__()
+        super(BasicDiscriminator, self).__init__()
         isize = opt.isize
         nz = opt.nz
         nc = opt.nc
@@ -265,19 +229,6 @@ class NetD(nn.Module):
 
         return classifier, features
 
-# ##
-# class DCGAN(nn.Module):
-#     """
-#     GENERATOR NETWORK
-#     """
-#     def __init__(self, opt):
-#         super(DCGAN, self).__init__()
-#         self.encoder = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-#         self.decoder = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-
-#     def forward(self, x):
-#         return self.decoder(self.encoder(x))
-
 ##
 class NetG(nn.Module):
     """
@@ -296,24 +247,10 @@ class NetG(nn.Module):
         latent_o = self.encoder2(gen_imag)
         return gen_imag, latent_i, latent_o
 
-##
-class DCGAN(nn.Module):
-    """
-    GENERATOR NETWORK
-    """
-    def __init__(self, opt):
-        super(DCGAN, self).__init__()
-        self.encoder = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-        self.decoder = Decoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
 
-    def forward(self, x):
-        z = self.encoder(x)
-        x = self.decoder(z)
-        return x, z
-
-# = = = = = = = = = #
-# Helper Functions  #
-# = = = = = = = = = #
+###############################################################################
+# Helper Functions
+###############################################################################
 ##
 def get_norm_layer(norm_type='instance'):
     if norm_type == 'batch':
@@ -361,19 +298,32 @@ def init_weights(net, init_type='normal', gain=0.02):
         elif classname.find('BatchNorm2d') != -1:
             init.normal_(m.weight.data, 1.0, gain)
             init.constant_(m.bias.data, 0.0)
-
-    print('initialize network with %s' % init_type)
     net.apply(init_func)
 
-
-def init_net(net, init_type='normal', gpus=[], initialize_weights=True):
-    if len(gpus) > 0:
+##
+def init_net(net, init_type='normal', gpu_ids=[]):
+    if len(gpu_ids) > 0:
         assert(torch.cuda.is_available())
-        net.to(gpus[0])
-        net = torch.nn.DataParallel(net, gpus)
-    if initialize_weights:
-        init_weights(net, init_type)
+        net.to(gpu_ids[0])
+        net = torch.nn.DataParallel(net, gpu_ids)
+    init_weights(net, init_type)
     return net
+
+##
+def define_G(opt, norm='batch', use_dropout=False, init_type='normal'):
+    netG = None
+    norm_layer = get_norm_layer(norm_type=norm)
+    num_layer = int(np.log2(opt.isize))
+    netG = UnetGenerator(opt.nc, opt.nc, num_layer, opt.ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    return init_net(netG, init_type, opt.gpu_ids)
+
+##
+def define_D(opt, norm='batch', use_sigmoid=False, init_type='normal'):
+    netD = None
+    norm_layer = get_norm_layer(norm_type=norm)
+    netD = BasicDiscriminator(opt)
+    return init_net(netD, init_type, opt.gpu_ids)
+
 
 ##############################################################################
 # Classes
@@ -652,205 +602,3 @@ class PixelDiscriminator(nn.Module):
 
     def forward(self, input):
         return self.net(input)
-
-# # # # # # # # # # # # #
-# MY UNET IMPLEMENTATION
-# class NetG_32(nn.Module):
-#     def __init__(self, n_channels=3, n_classes=3, nz=512):
-#         super(NetG_32, self).__init__()
-
-#         # UNET style Autoencoder layers.
-#         self.inc = InpConv(n_channels, 64)
-#         self.down1 = DownConv(64, 128)
-#         self.down2 = DownConv(128, 256)
-#         self.down3 = DownConv(256, 512)
-#         self.down4 = DownConv(512, 512)
-#         self.bneck = FeatConv(512, nz)
-#         self.up1 = UpConv(1024, 256)
-#         self.up2 = UpConv(512, 128)
-#         self.up3 = UpConv(256, 64)
-#         self.up4 = UpConv(128, 64)
-#         self.outc = OutConv(64, n_classes)
-
-#         # Feature Encoder layers.
-#         self.enc0 = InpConv(n_channels, 64)
-#         self.enc1 = DownConv(64, 128)
-#         self.enc2 = DownConv(128, 256)
-#         self.enc3 = DownConv(256, 512)
-#         self.enc4 = DownConv(512, 512)
-#         self.bneck_ = FeatConv(512, nz)
-
-#     def forward(self, x):
-#         x1 = self.inc(x)
-#         x2 = self.down1(x1)
-#         x3 = self.down2(x2)
-#         x4 = self.down3(x3)
-#         x5 = self.down4(x4)
-#         z = self.bneck(x5)
-#         x = self.up1(x5, x4)
-#         x = self.up2(x, x3)
-#         x = self.up3(x, x2)
-#         x = self.up4(x, x1)
-#         x = self.outc(x)
-#         z_ = self.enc0(x)
-#         z_ = self.enc1(z_)
-#         z_ = self.enc2(z_)
-#         z_ = self.enc3(z_)
-#         z_ = self.enc4(z_)
-#         z_ = self.bneck_(z_)
-
-#         return x, z, z_
-
-##
-class UNet32(nn.Module):
-    def __init__(self, n_channels=3, n_classes=3, nz=512):
-        super(UNet32, self).__init__()
-
-        # UNET style Autoencoder layers.
-        self.inc = InpConv(n_channels, 64)
-        self.down1 = DownConv(64, 128)
-        self.down2 = DownConv(128, 256)
-        self.down3 = DownConv(256, 512)
-        self.down4 = DownConv(512, 512)
-        self.bneck = FeatConv(512, nz)
-        self.up1 = UpConv(1024, 256)
-        self.up2 = UpConv(512, 128)
-        # self.up3 = OutConv(128, 64)
-        # self.up4 = OutConv(64, 64)
-        self.up3 = UpConv(256, 64)    # TODO This is OutConv
-        self.up4 = UpConv(128, 64)    # TODO This is OutConv
-        self.outc = OutConv(64, n_classes)
-
-        # # Feature Encoder layers.
-        # self.enc0 = InpConv(n_channels, 64)
-        # self.enc1 = DownConv(64, 128)
-        # self.enc2 = DownConv(128, 256)
-        # self.enc3 = DownConv(256, 512)
-        # self.enc4 = DownConv(512, 512)
-        # self.bneck_ = FeatConv(512, nz)
-
-    # def forward(self, x):
-    #     x1 = self.inc(x)
-    #     x2 = self.down1(x1)
-    #     x3 = self.down2(x2)
-    #     x4 = self.down3(x3)
-    #     x5 = self.down4(x4)
-    #     z = self.bneck(x5)
-    #     xu1 = self.up1(x5, x4)
-    #     xu2 = self.up2(xu1, x3)
-    #     # x = self.up3(x) # TODO This is OutConv
-    #     # x = self.up4(x) # TODO This is OutConv
-    #     xu3 = self.up3(xu2, x2) # TODO This is OutConv
-    #     xu4 = self.up4(xu3, x1) # TODO This is OutConv
-    #     xu5 = self.outc(xu4)
-    #     # z_ = self.enc0(x)
-    #     # z_ = self.enc1(z_)
-    #     # z_ = self.enc2(z_)
-    #     # z_ = self.enc3(z_)
-    #     # z_ = self.enc4(z_)
-    #     # z_ = self.bneck_(z_)
-
-    def forward(self, x):
-        x1 = self.inc(x)
-        x2 = self.down1(x1)
-        x3 = self.down2(x2)
-        x4 = self.down3(x3)
-        x5 = self.down4(x4)
-        z = self.bneck(x5)
-        x = self.up1(x5, x4)
-        x = self.up2(x, x3)
-        # x = self.up3(x) # TODO This is OutConv
-        # x = self.up4(x) # TODO This is OutConv
-        x = self.up3(x, x2) # TODO This is OutConv
-        x = self.up4(x, x1) # TODO This is OutConv
-        x = self.outc(x)
-        # z_ = self.enc0(x)
-        # z_ = self.enc1(z_)
-        # z_ = self.enc2(z_)
-        # z_ = self.enc3(z_)
-        # z_ = self.enc4(z_)
-        # z_ = self.bneck_(z_)
-
-
-        # return x, z, z_
-        # return xu5, xu4, xu3, xu2, xu1, x5, x4, x3, x2, x1
-        return x, z
-
-class InpConv(nn.Module):
-    def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):
-        super(InpConv, self).__init__()
-        self.iconv = nn.Conv2d(inp_chn, out_chn, kernel_size=kernel_size, stride=stride, padding=padding)
-    def forward(self, x):
-        x = self.iconv(x)
-        return x
-
-class DownConv(nn.Module):
-    def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):
-        super(DownConv, self).__init__()
-        self.dconv = nn.Sequential(
-            nn.LeakyReLU(negative_slope=0.2),
-            nn.Conv2d(inp_chn, out_chn, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.BatchNorm2d(out_chn, eps=1e-5, momentum=0.1, affine=True)
-        )
-    def forward(self, x):
-        x = self.dconv(x)
-        return x
-
-class UpConv(nn.Module):
-    def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1, bilinear=False):
-        super(UpConv, self).__init__()
-        if bilinear:
-            self.upconv = nn.Upsample(scale_factor=2, mode='bilinear')
-            # self.uconv = nn.Sequential(
-            #     nn.ReLU(),
-            #     nn.Upsample(scale_factor=2, mode='bilinear'),
-            #     nn.BatchNorm2d(num_features=inp_chn//2, eps=1e-5, momentum=0.1, affine=True)
-            # )
-        else:
-            self.upconv = nn.ConvTranspose2d(inp_chn//2, inp_chn//2, 2, stride=2)
-            # self.upconv = nn.Sequential(
-            #     nn.ReLU(),
-            #     nn.ConvTranspose2d(inp_chn//2, inp_chn//2, kernel_size=4, stride=2, padding=1),
-            #     nn.BatchNorm2d(num_features=inp_chn//2, eps=1e-5, momentum=0.1, affine=True)
-            # )
-
-        # self.conv = DoubleConv(inp_chn, out_chn)
-        self.conv = nn.Sequential(
-            nn.Conv2d(inp_chn, out_chn, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(out_chn),
-            nn.ReLU(),
-            nn.Conv2d(out_chn, out_chn, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(out_chn),
-            nn.ReLU()
-        )
-
-    def forward(self, x1, x2):
-        x1 = self.upconv(x1)
-        diffX = x1.size()[2] - x2.size()[2]
-        diffY = x1.size()[3] - x2.size()[3]
-        x2 = F.pad(x2, (diffX // 2, int(diffX / 2),
-                        diffY // 2, int(diffY / 2)))
-        x = torch.cat([x2, x1], dim=1)
-        x = self.conv(x)
-        return x
-
-class FeatConv(nn.Module):
-    def __init__(self, inp_chn, out_chn):
-        super(FeatConv, self).__init__()
-        self.featconv = nn.Conv2d(inp_chn, out_chn, kernel_size=3, stride=1, padding=1)
-
-    def forward(self, x):
-        x = self.featconv(x)
-        return x
-
-class OutConv(nn.Module):
-    def __init__(self, inp_chn, out_chn, kernel_size=4, stride=2, padding=1):
-        super(OutConv, self).__init__()
-        self.oconv = nn.Sequential(
-            nn.ReLU(),
-            nn.ConvTranspose2d(inp_chn, out_chn, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.Tanh()
-        )
-    def forward(self, x):
-        x = self.oconv(x)
-        return x
