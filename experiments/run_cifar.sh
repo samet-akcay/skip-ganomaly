@@ -2,10 +2,10 @@
 
 # Run CIFAR10 experiment on ganomaly
 
-declare -a arr=("plane" "car" "bird" "cat" "deer" "dog" "frog" "horse" "ship" "truck" )
+declare -a arr=("airplane" "automobile" "bird" "cat" "deer" "dog" "frog" "horse" "ship" "truck" )
 for i in "${arr[@]}";
 do
     echo "Running CIFAR. Anomaly Class: $i "
-    python train.py --dataset cifar10 --isize 32 --niter 25 --anomaly_class $i --display --model ganomaly2
+    python train.py --dataset cifar10 --isize 32 --niter 25 --abnormal_class $i --model skipganomaly
 done
 exit 0
