@@ -1,5 +1,4 @@
 """ Evaluate ROC
-
 Returns:
     auc, eer: Area under the curve, Equal Error Rate
 """
@@ -16,14 +15,10 @@ from scipy.optimize import brentq
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from matplotlib import rc
-import torch
 rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
 rc('text', usetex=True)
 
 def evaluate(labels, scores, metric='roc'):
-    if type(labels) == torch.Tensor: labels = labels.cpu().numpy()
-    if type(scores) == torch.Tensor: scores = scores.cpu().numpy()
-    
     if metric == 'roc':
         return roc(labels, scores)
     elif metric == 'auprc':
@@ -42,6 +37,9 @@ def roc(labels, scores, saveto=None):
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
+
+    labels = labels.cpu()
+    scores = scores.cpu()
 
     # True/False Positive Rates.
     fpr, tpr, _ = roc_curve(labels, scores)
@@ -65,7 +63,7 @@ def roc(labels, scores, saveto=None):
         plt.savefig(os.path.join(saveto, "ROC.pdf"))
         plt.close()
 
-    return roc_auc, eer
+    return roc_auc
 
 def auprc(labels, scores):
     ap = average_precision_score(labels, scores)
