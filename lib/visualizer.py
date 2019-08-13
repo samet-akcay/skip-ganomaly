@@ -27,7 +27,6 @@ class Visualizer():
         self.win_size = 256
         self.name = opt.name
         self.opt = opt
-        self.win = 0
         if self.opt.display:
             import visdom
             self.vis = visdom.Visdom(server=opt.display_server, port=opt.display_port)
@@ -48,9 +47,14 @@ class Visualizer():
         # --
         # Log file.
         self.log_name = os.path.join(opt.outf, opt.name, 'loss_log.txt')
-        with open(self.log_name, "a") as log_file:
-            now = time.strftime("%c")
-            log_file.write('================ Training Loss (%s) ================\n' % now)
+        # with open(self.log_name, "a") as log_file:
+        #     now = time.strftime("%c")
+        #     log_file.write('================ Training Loss (%s) ================\n' % now)
+        now  = time.strftime("%c")
+        title = f'================ {now} ================\n'
+        info  = f'{opt.abnormal_class}, {opt.nz}, {opt.w_adv}, {opt.w_con}, {opt.w_lat}\n'
+        self.write_to_log_file(text=title + info)
+
 
     ##
     @staticmethod
@@ -66,7 +70,7 @@ class Visualizer():
         return (inp - inp.min()) / (inp.max() - inp.min() + 1e-5)
 
     ##
-    def plot_current_errors(self, epoch, counter_ratio, errors, win=0):
+    def plot_current_errors(self, epoch, counter_ratio, errors):
         """Plot current errros.
 
         Args:
@@ -74,6 +78,7 @@ class Visualizer():
             counter_ratio (float): Ratio to plot the range between two epoch.
             errors (OrderedDict): Error for the current epoch.
         """
+
         if not hasattr(self, 'plot_data') or self.plot_data is None:
             self.plot_data = {'X': [], 'Y': [], 'legend': list(errors.keys())}
         self.plot_data['X'].append(epoch + counter_ratio)
@@ -87,7 +92,7 @@ class Visualizer():
                 'xlabel': 'Epoch',
                 'ylabel': 'Loss'
             },
-            win=win
+            win=4
         )
 
     ##
@@ -135,6 +140,11 @@ class Visualizer():
             log_file.write('%s\n' % message)
 
     ##
+    def write_to_log_file(self, text):
+        with open(self.log_name, "a") as log_file:
+            log_file.write('%s\n' % text)
+
+    ##
     def print_current_performance(self, performance, best):
         """ Print current performance results.
 
@@ -145,14 +155,12 @@ class Visualizer():
         message = '   '
         for key, val in performance.items():
             message += '%s: %.3f ' % (key, val)
-        # message += 'max AUC: %.3f' % best
-        message += f"max {self.opt.metric}: {best:.3f}"
+        message += 'max AUC: %.3f' % best
 
         print(message)
-        with open(self.log_name, "a") as log_file:
-            log_file.write('%s\n' % message)
+        self.write_to_log_file(text=message)
 
-    def display_current_images(self, images, win=0, title='Train'):
+    def display_current_images(self, reals, fakes, fixed):
         """ Display current images.
 
         Args:
@@ -162,20 +170,15 @@ class Visualizer():
             fakes ([FloatTensor]): Fake Image
             fixed ([FloatTensor]): Fixed Fake Image
         """
-        for key, val in images.items():
-            image = self.normalize(val.cpu().numpy())
-            self.vis.images(image, win=win+1, opts={'title': f"{title} {key}"}) 
-            win += 1
-        # reals = self.normalize(reals.cpu().numpy())
-        # fakes = self.normalize(fakes.cpu().numpy())
+        reals = self.normalize(reals.cpu().numpy())
+        fakes = self.normalize(fakes.cpu().numpy())
         # fixed = self.normalize(fixed.cpu().numpy())
 
-        # self.vis.images(reals, win=win+1, opts={'title': f'{title} Reals'})
-        # self.vis.images(fakes, win=win+2, opts={'title': f'{title} Fakes'})
+        self.vis.images(reals, win=1, opts={'title': 'Reals'})
+        self.vis.images(fakes, win=2, opts={'title': 'Fakes'})
         # self.vis.images(fixed, win=3, opts={'title': 'Fixed'})
 
-
-    def save_current_images(self, epoch, images):
+    def save_current_images(self, epoch, reals, fakes, fixed):
         """ Save images for epoch i.
 
         Args:
@@ -184,6 +187,6 @@ class Visualizer():
             fakes ([FloatTensor]): Fake Image
             fixed ([FloatTensor]): Fixed Fake Image
         """
-        vutils.save_image(images['reals'], '%s/reals.png' % self.img_dir, normalize=True)
-        vutils.save_image(images['fakes'], '%s/fakes.png' % self.img_dir, normalize=True)
-        vutils.save_image(images['fixed'], '%s/fixed_fakes_%03d.png' %(self.img_dir, epoch+1), normalize=True)
+        vutils.save_image(reals, '%s/reals.png' % self.img_dir, normalize=True)
+        vutils.save_image(fakes, '%s/fakes.png' % self.img_dir, normalize=True)
+        vutils.save_image(fixed, '%s/fixed_fakes_%03d.png' %(self.img_dir, epoch+1), normalize=True)
