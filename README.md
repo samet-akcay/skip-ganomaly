@@ -1,6 +1,6 @@
 # Skip-GANomaly
 
-This repository contains PyTorch implementation of the following paper: Skip-GANomaly: Skip Connected and Adversarially Trained Encoder-Decoder Anomaly Detection [[1]](#reference)
+This repository contains PyTorch implementation of the following paper: Skip-GANomaly: Skip Connected and Adversarially Trained Encoder-Decoder Anomaly Detection [[1]](#6-reference)
 
 ## 1. Table of Contents
 - [Skip-GANomaly](#skip-ganomaly)
