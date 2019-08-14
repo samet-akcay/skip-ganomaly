@@ -8,7 +8,7 @@ This repository contains PyTorch implementation of the following paper: Skip-GAN
   - [2. Installation](#2-installation)
   - [3. Experiment](#3-experiment)
   - [4. Training](#4-training)
-    - [4.1. Training on CIFAR10](#41-training-on-cifar10)
+    - [4.1. Train on CIFAR10](#41-training-on-cifar10)
     - [4.2. Train on Custom Dataset](#42-train-on-custom-dataset)
   - [5. Citing Skip-GANomaly](#5-citing-skip-ganomaly)
   - [6. Reference](#6-reference)
