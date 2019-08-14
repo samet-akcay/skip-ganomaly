@@ -84,7 +84,7 @@ Custom Dataset
 
 ```
 
-Then model training is the same as training MNIST or CIFAR10 datasets explained above.
+Then model training is the same as the training explained above.
 
 ```
 python train.py                     \
