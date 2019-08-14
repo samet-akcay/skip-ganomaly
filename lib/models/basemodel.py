@@ -96,7 +96,7 @@ class BaseModel():
         return errors
 
     ##
-    def reinit_netd(self):
+    def reinit_d(self):
         """ Initialize the weights of netD
         """
         self.netd.apply(weights_init)

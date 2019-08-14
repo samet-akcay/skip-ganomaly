@@ -26,14 +26,14 @@ from lib.models.basemodel import BaseModel
 
 
 
-class SkipGANomaly(BaseModel):
+class Skipganomaly(BaseModel):
     """GANomaly Class
     """
     @property
     def name(self): return 'skip-ganomaly'
 
     def __init__(self, opt, data=None):
-        super(SkipGANomaly, self).__init__(opt, data)
+        super(Skipganomaly, self).__init__(opt, data)
         ##
 
         # -- Misc attributes
