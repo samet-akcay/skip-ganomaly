@@ -34,12 +34,9 @@ This repository contains PyTorch implementation of the following paper: Skip-GAN
    ```
 
 ## 3. Experiment
-To replicate the results in the paper for MNIST and CIFAR10  datasets, run the following commands:
+To replicate the results in the paper for CIFAR10  dataset, run the following commands:
 
 ``` shell
-# MNIST
-sh experiments/run_mnist.sh
-
 # CIFAR
 sh experiments/run_cifar.sh
 ```
