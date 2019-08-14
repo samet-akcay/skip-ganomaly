@@ -2,18 +2,16 @@
 
 This repository contains PyTorch implementation of the following paper: Skip-GANomaly: Skip Connected and Adversarially Trained Encoder-Decoder Anomaly Detection [[1]](#reference)
 
-##  1. Table of Contents
+## 1. Table of Contents
 - [Skip-GANomaly](#skip-ganomaly)
-    - [Table of Contents](#table-of-contents)
-    - [Installation](#installation)
-    - [Experiment](#experiment)
-    - [Training](#training)
-        - [Training on MNIST](#training-on-mnist)
-        - [Training on CIFAR10](#training-on-cifar10)
-        - [Train on Custom Dataset](#train-on-custom-dataset)
-    - [Citing Skip-GANomaly](#citing-skip-ganomaly)
-    - [Reference](#reference)
-    
+  - [1. Table of Contents](#1-table-of-contents)
+  - [2. Installation](#2-installation)
+  - [3. Experiment](#3-experiment)
+  - [4. Training](#4-training)
+    - [4.1. Training on CIFAR10](#41-training-on-cifar10)
+    - [4.2. Train on Custom Dataset](#42-train-on-custom-dataset)
+  - [5. Citing Skip-GANomaly](#5-citing-skip-ganomaly)
+  - [6. Reference](#6-reference)
 
 ## 2. Installation
 1. First clone the repository
@@ -28,7 +26,7 @@ This repository contains PyTorch implementation of the following paper: Skip-GAN
     ```
     conda activate skipganomaly
     ```
-3. Install the dependencies.
+4. Install the dependencies.
    ```
    pip install --user --requirement requirements.txt
    ```
