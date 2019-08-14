@@ -41,7 +41,7 @@ To replicate the results in the paper for MNIST and CIFAR10  datasets, run the f
 sh experiments/run_mnist.sh
 
 # CIFAR
-sh experiments/run_cifar.sh # CIFAR10
+sh experiments/run_cifar.sh
 ```
 
 ## 4. Training
