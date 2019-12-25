@@ -86,57 +86,66 @@ class Skipganomaly(BaseModel):
             self.optimizers.append(self.optimizer_d)
             self.optimizers.append(self.optimizer_g)
             self.schedulers = [get_scheduler(optimizer, opt) for optimizer in self.optimizers]
-    
-    ##
-    def update_netd(self):
+
+    def forward(self):
+        self.forward_g()
+        self.forward_d()
+
+    def forward_g(self):
+        """ Forward propagate through netG
         """
-        Update D network:
-        """
-        # BCE
-        self.netd.zero_grad()
-        # --
-        # Train with real
-        self.pred_real, self.feat_real = self.netd(self.input)
-        self.err_d_real = self.l_adv(self.pred_real, self.real_label)
-        # --
-        # Train with fake
         self.fake = self.netg(self.input + self.noise)
 
-        self.pred_fake, self.feat_fake = self.netd(self.fake.detach())
-        self.err_d_fake = self.l_adv(self.pred_fake, self.fake_label)
-
-        # Feature Loss btw real and fake images.
-        self.err_g_lat = self.opt.w_lat * self.l_lat(self.feat_fake, self.feat_real)
-
-        # --
-        self.err_d = self.err_d_real + self.err_d_fake + self.err_g_lat
-        self.err_d.backward(retain_graph=True)
-        self.optimizer_d.step()
-
-    ##
-    def update_netg(self):
+    def forward_d(self):
+        """ Forward propagate through netD
         """
-        Update Generator Network.
-        """
-        self.netg.zero_grad()
-        self.out_g, _ = self.netd(self.fake)
+        self.pred_real, self.feat_real = self.netd(self.input)
+        self.pred_fake, self.feat_fake = self.netd(self.fake)
 
-        self.err_g_adv = self.opt.w_adv * self.l_adv(self.out_g, self.real_label)
+    def backward_g(self):
+        """ Backpropagate netg
+        """
+        self.err_g_adv = self.opt.w_adv * self.l_adv(self.pred_fake, self.real_label)
         self.err_g_con = self.opt.w_con * self.l_con(self.fake, self.input)
+        self.err_g_lat = self.opt.w_lat * self.l_lat(self.feat_fake, self.feat_real)
 
         self.err_g = self.err_g_adv + self.err_g_con + self.err_g_lat
         self.err_g.backward(retain_graph=True)
+
+    def backward_d(self):
+        # Fake
+        pred_fake, _ = self.netd(self.fake.detach())
+        self.err_d_fake = self.l_adv(pred_fake, self.fake_label)
+
+        # Real
+        # pred_real, feat_real = self.netd(self.input)
+        self.err_d_real = self.l_adv(self.pred_real, self.real_label)
+
+        # Combine losses.
+        self.err_d = self.err_d_real + self.err_d_fake + self.err_g_lat
+        self.err_d.backward(retain_graph=True)
+
+    def update_netg(self):
+        """ Update Generator Network.
+        """       
+        self.optimizer_g.zero_grad()
+        self.backward_g()
         self.optimizer_g.step()
 
+    def update_netd(self):
+        """ Update Discriminator Network.
+        """       
+        self.optimizer_d.zero_grad()
+        self.backward_d()
+        self.optimizer_d.step()
+        if self.err_d < 1e-5: self.reinit_d()
     ##
     def optimize_params(self):
         """ Optimize netD and netG  networks.
         """
-        self.update_netd()
+        self.forward()
         self.update_netg()
-
-        # If D loss is zero, then re-initialize netD
-        if self.err_d < 1e-5: self.reinit_d()
+        self.update_netd()
 
     ##
     def test(self, plot_hist=False):
