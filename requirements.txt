@@ -17,7 +17,7 @@ matplotlib==3.1.0
 # mkl-fft==1.0.12
 # mkl-random==1.0.2
 # mkl-service==2.0.2
-numpy==1.16.4
+numpy==1.22.0
 olefile==0.46
 pandas==0.25.0
 parso==0.5.1
